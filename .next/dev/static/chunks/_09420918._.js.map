@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/marienel/Downloads/clinic-management-system/app/page.tsx"],"sourcesContent":["\"use client\"\n\nimport { useRouter } from \"next/navigation\"\nimport { useEffect } from \"react\"\n\nexport default function Home() {\n  const router = useRouter()\n\n  useEffect(() => {\n    // Clear all localStorage data on page load to start fresh\n    localStorage.clear()\n    \n    router.push(\"/login\")\n  }, [router])\n\n  return null\n}\n"],"names":[],"mappings":";;;;AAEA;AACA;;AAHA;;;AAKe,SAAS;;IACtB,MAAM,SAAS,IAAA,iRAAS;IAExB,IAAA,ySAAS;0BAAC;YACR,0DAA0D;YAC1D,aAAa,KAAK;YAElB,OAAO,IAAI,CAAC;QACd;yBAAG;QAAC;KAAO;IAEX,OAAO;AACT;GAXwB;;QACP,iRAAS;;;KADF"}},
+    {"offset": {"line": 42, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/marienel/Downloads/clinic-management-system/node_modules/.pnpm/next%4016.0.8_react-dom%4019.2.0_react%4019.2.0__react%4019.2.0/node_modules/next/navigation.js"],"sourcesContent":["module.exports = require('./dist/client/components/navigation')\n"],"names":[],"mappings":"AAAA,OAAO,OAAO","ignoreList":[0]}}]
+}

@@ -1,0 +1,22 @@
+{
+  "/(auth)/login/page": "/login",
+  "/(auth)/signup/page": "/signup",
+  "/(dashboard)/contacts/page": "/contacts",
+  "/(dashboard)/dashboard/page": "/dashboard",
+  "/(dashboard)/monitoring/page": "/monitoring",
+  "/(dashboard)/patients/page": "/patients",
+  "/(dashboard)/profile/page": "/profile",
+  "/(dashboard)/visit-records/page": "/visit-records",
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/activities/route": "/api/activities",
+  "/api/auth/check-username/route": "/api/auth/check-username",
+  "/api/auth/login/route": "/api/auth/login",
+  "/api/auth/signup/route": "/api/auth/signup",
+  "/api/clinic-contacts/route": "/api/clinic-contacts",
+  "/api/contacts/route": "/api/contacts",
+  "/api/patients/route": "/api/patients",
+  "/api/users/profile/route": "/api/users/profile",
+  "/api/visits/route": "/api/visits",
+  "/page": "/"
+}

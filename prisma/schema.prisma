@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./prisma/dev.db"
+}
+
+//
+// ─── PATIENT MODEL ─────────────────────────────────────────────────────────────
+//
+model Patient {
+  id                String        @id @default(cuid())
+
+  // Personal Information
+  firstName         String
+  middleName        String?       // optional
+  lastName          String
+  suffix            String?       // optional
+  dateOfBirth       String
+  gender            String
+  phone             String
+  email             String?       // optional
+  address           String?       // optional
+
+  // School Information
+  role              String        // student | teaching_staff | non_teaching_staff
+  idNumber          String
+
+  // Student-specific fields
+  program           String?       // CICT | CBME
+  course            String?       // BSIT | BSCS | etc.
+  yearLevel         Int?
+  block             Int?
+
+  // Teaching Staff specific fields
+  department        String?       // CICT | CBME
+
+  // Non-teaching Staff specific fields
+  staffCategory     String?       // Administrative | Security | etc.
+
+  // Medical History
+  pastIllnesses     String?
+  surgeries         String?
+  currentMedication String?
+  allergies         String?
+  medicalNotes      String?
+
+  // Emergency Contacts
+  primaryContactName           String?
+  primaryContactRelationship   String?
+  primaryContactPhone          String?
+  primaryContactAddress        String?
+  secondaryContactName         String?
+  secondaryContactRelationship String?
+  secondaryContactPhone        String?
+  secondaryContactAddress      String?
+
+  attachments       String?      // optional, can store JSON or file URLs
+
+  // Relations
+  userId            String
+  User              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  VisitRecord       VisitRecord[]
+
+  // Timestamps
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+//
+// ─── USER MODEL ────────────────────────────────────────────────────────────────
+//
+model User {
+  id            String          @id @default(cuid())
+  username      String          @unique
+  email         String          @unique
+  password      String
+  fullName      String
+  role          String          @default("student")
+  phone         String?
+  address       String?
+  avatar        String?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  Activity      Activity[]
+  ClinicContact ClinicContact[]
+  Contact       Contact[]
+  Patient       Patient[]
+  VisitRecord   VisitRecord[]
+}
+
+//
+// ─── CONTACT MODEL ─────────────────────────────────────────────────────────────
+//
+model Contact {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  email        String
+  relationship String?
+  userId       String
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//
+// ─── CLINIC CONTACT MODEL ──────────────────────────────────────────────────────
+//
+model ClinicContact {
+  id        String   @id @default(cuid())
+  name      String
+  icon      String
+  link      String
+  notes     String?
+  userId    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//
+// ─── ACTIVITY MODEL ───────────────────────────────────────────────────────────
+//
+model Activity {
+  id        String   @id @default(cuid())
+  type      String   @default("action")
+  message   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//
+// ─── VISIT RECORD MODEL ───────────────────────────────────────────────────────
+//
+model VisitRecord {
+  id        String   @id @default(cuid())
+  patientId String
+  userId    String
+
+  visitDate String
+  reason    String
+  symptoms  String
+  treatment String
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

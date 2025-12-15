@@ -1,0 +1,14 @@
+{
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(dashboard)/contacts/page": "app/(dashboard)/contacts/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/patients/page": "app/(dashboard)/patients/page.js",
+  "/(dashboard)/visit-records/page": "app/(dashboard)/visit-records/page.js",
+  "/api/activities/route": "app/api/activities/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/clinic-contacts/route": "app/api/clinic-contacts/route.js",
+  "/api/contacts/route": "app/api/contacts/route.js",
+  "/api/patients/route": "app/api/patients/route.js",
+  "/api/visits/route": "app/api/visits/route.js",
+  "/page": "app/page.js"
+}

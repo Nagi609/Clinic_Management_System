@@ -1,0 +1,22 @@
+{
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(auth)/signup/page": "app/(auth)/signup/page.js",
+  "/(dashboard)/contacts/page": "app/(dashboard)/contacts/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/monitoring/page": "app/(dashboard)/monitoring/page.js",
+  "/(dashboard)/patients/page": "app/(dashboard)/patients/page.js",
+  "/(dashboard)/profile/page": "app/(dashboard)/profile/page.js",
+  "/(dashboard)/visit-records/page": "app/(dashboard)/visit-records/page.js",
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/activities/route": "app/api/activities/route.js",
+  "/api/auth/check-username/route": "app/api/auth/check-username/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/signup/route": "app/api/auth/signup/route.js",
+  "/api/clinic-contacts/route": "app/api/clinic-contacts/route.js",
+  "/api/contacts/route": "app/api/contacts/route.js",
+  "/api/patients/route": "app/api/patients/route.js",
+  "/api/users/profile/route": "app/api/users/profile/route.js",
+  "/api/visits/route": "app/api/visits/route.js",
+  "/page": "app/page.js"
+}
