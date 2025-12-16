@@ -1,13 +1,8 @@
-# Patient Form Improvements TODO
+# TODO: Remove Role from Account Creation and Profile
 
-## Tasks
-- [x] Update Calendar component to restrict to past dates (up to today), add year/month dropdowns for easier selection, and ensure popover positioning doesn't overflow above/below the field
-- [x] Change yearLevel input to select dropdown with options 1-4
-- [x] Change block input to select dropdown with options 1-5 (made optional)
-- [x] Add placeholders to all form fields (inputs, textareas, selects)
-- [x] Fix course options to populate correctly when program is selected (initially empty, populate after selection)
-
-## Followup Steps
-- [x] Test the form to ensure date picker works as expected
-- [x] Verify dropdowns for year and block function properly
-- [x] Check that all placeholders are displayed correctly
+## Pending Tasks
+- [x] Remove role selection from signup form (app/(auth)/signup/page.tsx)
+- [x] Update signup API to default role to 'admin' (app/api/auth/signup/route.ts)
+- [x] Remove role display from profile page (app/(dashboard)/profile/page.tsx)
+- [x] Update profile API to exclude role from response (app/api/users/profile/route.ts)
+- [x] Test signup and profile functionality after changes

@@ -90,7 +90,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$bc
 ;
 async function POST(request) {
     try {
-        const { username, email, password, fullName, role } = await request.json();
+        const { username, email, password, fullName } = await request.json();
         // Validation
         if (!username || !email || !password || !fullName) {
             return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
@@ -134,7 +134,7 @@ async function POST(request) {
                 email,
                 password: hashedPassword,
                 fullName,
-                role: role || 'student'
+                role: 'admin'
             }
         });
         // Return user data (without password)

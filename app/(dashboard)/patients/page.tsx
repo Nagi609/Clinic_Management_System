@@ -92,6 +92,40 @@ const COURSE_OPTIONS: Record<Program, string[]> = {
   CBME: ["BSA", "BSAIS", "BPA", "BSE"],
 }
 
+const initialFormData: FormData = {
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  suffix: "",
+  dateOfBirth: "",
+  gender: "Male",
+  phone: "",
+  email: "",
+  address: "",
+  role: "student",
+  idNumber: "",
+  program: "",
+  course: "",
+  yearLevel: "",
+  block: "",
+  department: "",
+  staffCategory: "",
+  pastIllnesses: "",
+  surgeries: "",
+  currentMedication: "",
+  allergies: "",
+  medicalNotes: "",
+  primaryContactName: "",
+  primaryContactRelationship: "",
+  primaryContactPhone: "",
+  primaryContactAddress: "",
+  secondaryContactName: "",
+  secondaryContactRelationship: "",
+  secondaryContactPhone: "",
+  secondaryContactAddress: "",
+  attachments: "",
+}
+
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -275,7 +309,8 @@ export default function PatientsPage() {
         toast({ title: "Success", description: `Patient ${patientName} has been ${action} successfully.` })
 
         if (!editingPatient) {
-          setFormData({ ...formData, firstName: "", lastName: "", phone: "" }) // reset
+          setShowForm(false)
+          setFormData(initialFormData)
           setSelectedDateOfBirth(undefined)
           setAvailableCourses([])
           setFormErrors({})
@@ -420,8 +455,6 @@ export default function PatientsPage() {
           >
             <option value="name_az">Name (A-Z)</option>
             <option value="name_za">Name (Z-A)</option>
-            <option value="role_az">Role (A-Z)</option>
-            <option value="role_za">Role (Z-A)</option>
             <option value="id_asc">ID (Ascending)</option>
             <option value="id_desc">ID (Descending)</option>
           </select>
@@ -534,6 +567,9 @@ export default function PatientsPage() {
                           }}
                           disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                           initialFocus
+                          captionLayout="dropdown"
+                          fromYear={1900}
+                          toYear={new Date().getFullYear()}
                         />
                       </PopoverContent>
                     </Popover>
@@ -551,6 +587,177 @@ export default function PatientsPage() {
                     />
                     {formErrors.phone && <p className="text-red-500 text-xs mt-1">Valid contact number is required</p>}
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="Enter email address"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      placeholder="Enter address"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Role Information Section */}
+                <div className="border-b pb-4 mt-6">
+                  <h3 className="text-lg font-medium mb-4 text-gray-800">Role Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                      <select
+                        name="role"
+                        value={formData.role}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="student">Student</option>
+                        <option value="teaching_staff">Teaching Staff</option>
+                        <option value="non_teaching_staff">Non-Teaching Staff</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID Number *</label>
+                      <input
+                        type="text"
+                        name="idNumber"
+                        value={formData.idNumber}
+                        onChange={handleInputChange}
+                        placeholder="Enter ID number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  {formData.role === 'student' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Program *</label>
+                        <select
+                          ref={programRef}
+                          name="program"
+                          value={formData.program}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.program ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select program</option>
+                          <option value="CICT">CICT</option>
+                          <option value="CBME">CBME</option>
+                        </select>
+                        {formErrors.program && <p className="text-red-500 text-xs mt-1">Program is required</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Course *</label>
+                        <select
+                          ref={courseRef}
+                          name="course"
+                          value={formData.course}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.course ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select course</option>
+                          {availableCourses.map((course) => (
+                            <option key={course} value={course}>
+                              {course}
+                            </option>
+                          ))}
+                        </select>
+                        {formErrors.course && <p className="text-red-500 text-xs mt-1">Course is required</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Year Level *</label>
+                        <select
+                          ref={yearLevelRef}
+                          name="yearLevel"
+                          value={formData.yearLevel}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.yearLevel ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select year level</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                        </select>
+                        {formErrors.yearLevel && <p className="text-red-500 text-xs mt-1">Year level is required</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Block</label>
+                        <select
+                          name="block"
+                          value={formData.block}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select block (optional)</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                          <option value="5">5</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  {formData.role === 'teaching_staff' && (
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+                        <select
+                          ref={departmentRef}
+                          name="department"
+                          value={formData.department}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.department ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select department</option>
+                          <option value="CICT">CICT</option>
+                          <option value="CBME">CBME</option>
+                        </select>
+                        {formErrors.department && <p className="text-red-500 text-xs mt-1">Department is required</p>}
+                      </div>
+                    </div>
+                  )}
+                  {formData.role === 'non_teaching_staff' && (
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Staff Category *</label>
+                        <select
+                          ref={staffCategoryRef}
+                          name="staffCategory"
+                          value={formData.staffCategory}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.staffCategory ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select category</option>
+                          <option value="Administration">Administration</option>
+                          <option value="Accounting">Accounting</option>
+                          <option value="Human Resources">Human Resources</option>
+                          <option value="Student Service">Student Service</option>
+                          <option value="Library">Library</option>
+                          <option value="Maintenance">Maintenance</option>
+                          <option value="Security">Security</option>
+                          <option value="Supply">Supply</option>
+                          <option value="Clinic">Clinic</option>
+                        </select>
+                        {formErrors.staffCategory && <p className="text-red-500 text-xs mt-1">Staff category is required</p>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Medical Information Section */}
@@ -745,95 +952,96 @@ export default function PatientsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Patient List */}
-            <div className="bg-white p-6 rounded-lg shadow-md border">
-              <h2 className="text-xl font-semibold mb-4">Patient List</h2>
-              {filteredPatients.length === 0 ? (
-                <p className="text-gray-500 text-center">No patients found</p>
-              ) : (
-                <div className="space-y-4">
-                  {filteredPatients.map((patient) => (
-                    <div key={patient.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold">{getFullName(patient)}</h3>
-                          <p className="text-sm text-gray-600">ID: {patient.idNumber} | Role: {patient.role.replace('_', ' ')}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setExpandedId(expandedId === patient.id ? null : patient.id)}>
-                            {expandedId === patient.id ? "Hide Details" : "Show Details"}
-                          </Button>
-                          {canEditPatients && (
-                            <Button variant="outline" size="sm" onClick={() => handleEditClick(patient)}>
-                              <Edit2 className="h-4 w-4" />
+        {/* Patient List */}
+        <div className="bg-white p-6 rounded-lg shadow-md border">
+          <h2 className="text-xl font-semibold mb-4">Patient List</h2>
+          {filteredPatients.length === 0 ? (
+            <p className="text-gray-500 text-center">No patients found</p>
+          ) : (
+            <div className="space-y-4">
+              {filteredPatients.map((patient) => (
+                <div key={patient.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold">{getFullName(patient)}</h3>
+                      <p className="text-sm text-gray-600">ID: {patient.idNumber} | Role: {patient.role.replace('_', ' ')}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setExpandedId(expandedId === patient.id ? null : patient.id)}>
+                        {expandedId === patient.id ? "Hide Details" : "Show Details"}
+                      </Button>
+                      {canEditPatients && (
+                        <Button variant="outline" size="sm" onClick={() => handleEditClick(patient)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canManagePatients && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <X className="h-4 w-4" />
                             </Button>
-                          )}
-                          {canManagePatients && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Patient</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete {getFullName(patient)}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(patient.id)} className="bg-red-500 hover:bg-red-600">
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </div>
-                      </div>
-                      {expandedId === patient.id && (
-                        <div className="mt-4 space-y-2">
-                          <p><strong>Email:</strong> {patient.email || 'N/A'}</p>
-                          <p><strong>Phone:</strong> {patient.phone}</p>
-                          <p><strong>Address:</strong> {patient.address || 'N/A'}</p>
-                          <p><strong>Date of Birth:</strong> {new Date(patient.dateOfBirth).toLocaleDateString()}</p>
-                          {patient.role === 'student' && (
-                            <>
-                              <p><strong>Program:</strong> {patient.program}</p>
-                              <p><strong>Course:</strong> {patient.course}</p>
-                              <p><strong>Year Level:</strong> {patient.yearLevel}</p>
-                              <p><strong>Block:</strong> {patient.block || 'N/A'}</p>
-                            </>
-                          )}
-                          {patient.role === 'teaching_staff' && (
-                            <p><strong>Department:</strong> {patient.department}</p>
-                          )}
-                          {patient.role === 'non_teaching_staff' && (
-                            <p><strong>Category:</strong> {patient.staffCategory}</p>
-                          )}
-                          <p><strong>Past Illnesses:</strong> {patient.pastIllnesses || 'N/A'}</p>
-                          <p><strong>Surgeries:</strong> {patient.surgeries || 'N/A'}</p>
-                          <p><strong>Current Medication:</strong> {patient.currentMedication || 'N/A'}</p>
-                          <p><strong>Allergies:</strong> {patient.allergies || 'N/A'}</p>
-                          <p><strong>Medical Notes:</strong> {patient.medicalNotes || 'N/A'}</p>
-                          <p><strong>Primary Contact:</strong> {patient.primaryContactName} ({patient.primaryContactRelationship}) - {patient.primaryContactPhone}</p>
-                          {patient.secondaryContactName && (
-                            <p><strong>Secondary Contact:</strong> {patient.secondaryContactName} ({patient.secondaryContactRelationship}) - {patient.secondaryContactPhone}</p>
-                          )}
-                          {patient.attachments && (
-                            <p><strong>Attachments:</strong> <a href={patient.attachments} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><Paperclip className="inline h-4 w-4 mr-1" />View</a></p>
-                          )}
-                        </div>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Patient</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {getFullName(patient)}? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(patient.id)} className="bg-red-500 hover:bg-red-600">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
-                  ))}
+                  </div>
+                  {expandedId === patient.id && (
+                    <div className="mt-4 space-y-2">
+                      <p><strong>Email:</strong> {patient.email || 'N/A'}</p>
+                      <p><strong>Phone:</strong> {patient.phone}</p>
+                      <p><strong>Address:</strong> {patient.address || 'N/A'}</p>
+                      <p><strong>Date of Birth:</strong> {new Date(patient.dateOfBirth).toLocaleDateString()}</p>
+                      {patient.role === 'student' && (
+                        <>
+                          <p><strong>Program:</strong> {patient.program}</p>
+                          <p><strong>Course:</strong> {patient.course}</p>
+                          <p><strong>Year Level:</strong> {patient.yearLevel}</p>
+                          <p><strong>Block:</strong> {patient.block || 'N/A'}</p>
+                        </>
+                      )}
+                      {patient.role === 'teaching_staff' && (
+                        <p><strong>Department:</strong> {patient.department}</p>
+                      )}
+                      {patient.role === 'non_teaching_staff' && (
+                        <p><strong>Category:</strong> {patient.staffCategory}</p>
+                      )}
+                      <p><strong>Past Illnesses:</strong> {patient.pastIllnesses || 'N/A'}</p>
+                      <p><strong>Surgeries:</strong> {patient.surgeries || 'N/A'}</p>
+                      <p><strong>Current Medication:</strong> {patient.currentMedication || 'N/A'}</p>
+                      <p><strong>Allergies:</strong> {patient.allergies || 'N/A'}</p>
+                      <p><strong>Medical Notes:</strong> {patient.medicalNotes || 'N/A'}</p>
+                      <p><strong>Primary Contact:</strong> {patient.primaryContactName} ({patient.primaryContactRelationship}) - {patient.primaryContactPhone}</p>
+                      {patient.secondaryContactName && (
+                        <p><strong>Secondary Contact:</strong> {patient.secondaryContactName} ({patient.secondaryContactRelationship}) - {patient.secondaryContactPhone}</p>
+                      )}
+                      {patient.attachments && (
+                        <p><strong>Attachments:</strong> <a href={patient.attachments} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><Paperclip className="inline h-4 w-4 mr-1" />View</a></p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
+        </div>
         </div>
       </LayoutWrapper>
     )

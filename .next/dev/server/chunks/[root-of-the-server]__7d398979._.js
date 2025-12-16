@@ -73,10 +73,14 @@ const __TURBOPACK__default__export__ = prisma;
 "use strict";
 
 __turbopack_context__.s([
+    "DELETE",
+    ()=>DELETE,
     "GET",
     ()=>GET,
     "POST",
-    ()=>POST
+    ()=>POST,
+    "PUT",
+    ()=>PUT
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/.pnpm/next@16.0.8_react-dom@19.2.0_react@19.2.0__react@19.2.0/node_modules/next/server.js [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/lib/db.ts [app-route] (ecmascript)");
@@ -97,13 +101,11 @@ const parseAttachments = (attachments)=>{
 async function GET(request) {
     try {
         const userId = request.headers.get('x-user-id');
-        if (!userId) {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                error: 'Unauthorized'
-            }, {
-                status: 401
-            });
-        }
+        if (!userId) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Unauthorized'
+        }, {
+            status: 401
+        });
         const patients = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.findMany({
             where: {
                 userId
@@ -127,14 +129,15 @@ async function GET(request) {
 async function POST(request) {
     try {
         const userId = request.headers.get('x-user-id');
-        if (!userId) {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                error: 'Unauthorized'
-            }, {
-                status: 401
-            });
-        }
+        if (!userId) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Unauthorized'
+        }, {
+            status: 401
+        });
         const data = await request.json();
+        // Parse numeric fields
+        data.yearLevel = data.yearLevel ? parseInt(data.yearLevel) : null;
+        data.block = data.block ? parseInt(data.block) : null;
         const errors = [];
         // ===== Basic validations =====
         if (!validateNameField(data.firstName)) errors.push('First name is required and must be letters only');
@@ -149,9 +152,7 @@ async function POST(request) {
             'student',
             'teaching_staff',
             'non_teaching_staff'
-        ].includes(data.role)) {
-            errors.push('Valid role is required');
-        }
+        ].includes(data.role)) errors.push('Valid role is required');
         if (!validateIdNumber(data.idNumber)) errors.push('Valid ID number is required');
         // ===== Role-specific =====
         if (data.role === 'student') {
@@ -176,18 +177,16 @@ async function POST(request) {
         if (!data.primaryContactName?.trim()) errors.push('Primary contact name is required');
         if (!data.primaryContactRelationship?.trim()) errors.push('Primary contact relationship is required');
         if (!validatePhone(data.primaryContactPhone)) errors.push('Primary contact phone is invalid');
-        if (errors.length > 0) {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                errors
-            }, {
-                status: 400
-            });
-        }
+        if (errors.length > 0) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            errors
+        }, {
+            status: 400
+        });
         // ===== CREATE =====
         const patient = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.create({
             data: {
                 ...data,
-                dateOfBirth: new Date(data.dateOfBirth),
+                dateOfBirth: new Date(data.dateOfBirth).toISOString(),
                 middleName: data.middleName || null,
                 suffix: data.suffix || null,
                 email: data.email || null,
@@ -221,6 +220,146 @@ async function POST(request) {
         console.error('Create patient error:', error);
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             error: 'Failed to save patient',
+            details: error.message
+        }, {
+            status: 500
+        });
+    }
+}
+async function PUT(request) {
+    try {
+        const userId = request.headers.get('x-user-id');
+        if (!userId) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Unauthorized'
+        }, {
+            status: 401
+        });
+        const data = await request.json();
+        const { id, ...updateData } = data;
+        // Parse numeric fields
+        updateData.yearLevel = updateData.yearLevel ? parseInt(updateData.yearLevel) : null;
+        updateData.block = updateData.block ? parseInt(updateData.block) : null;
+        const errors = [];
+        if (!id) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Patient ID is required'
+        }, {
+            status: 400
+        });
+        // ===== Basic validations =====
+        if (!validateNameField(updateData.firstName)) errors.push('First name is required and must be letters only');
+        if (updateData.middleName && !validateNameField(updateData.middleName)) errors.push('Middle name must contain letters only');
+        if (!validateNameField(updateData.lastName)) errors.push('Last name is required and must be letters only');
+        if (updateData.suffix && !validateNameField(updateData.suffix)) errors.push('Suffix must contain letters only');
+        if (!updateData.dateOfBirth) errors.push('Date of birth is required');
+        if (isNaN(Date.parse(updateData.dateOfBirth))) errors.push('Invalid date of birth');
+        if (!updateData.gender) errors.push('Gender is required');
+        if (!validatePhone(updateData.phone)) errors.push('Phone must start with 09 and be exactly 11 digits');
+        if (!updateData.role || ![
+            'student',
+            'teaching_staff',
+            'non_teaching_staff'
+        ].includes(updateData.role)) errors.push('Valid role is required');
+        if (!validateIdNumber(updateData.idNumber)) errors.push('Valid ID number is required');
+        // ===== Role-specific =====
+        if (updateData.role === 'student') {
+            if (![
+                'CICT',
+                'CBME'
+            ].includes(updateData.program)) errors.push('Valid program is required for students');
+            if (!updateData.course) errors.push('Course is required for students');
+            if (!updateData.yearLevel || updateData.yearLevel < 1 || updateData.yearLevel > 4) errors.push('Year level must be 1–4');
+            if (updateData.block && (updateData.block < 1 || updateData.block > 5)) errors.push('Block must be 1–5');
+        }
+        if (updateData.role === 'teaching_staff') {
+            if (![
+                'CICT',
+                'CBME'
+            ].includes(updateData.department)) errors.push('Valid department is required');
+        }
+        if (updateData.role === 'non_teaching_staff') {
+            if (!updateData.staffCategory) errors.push('Staff category is required');
+        }
+        // ===== Emergency contact =====
+        if (!updateData.primaryContactName?.trim()) errors.push('Primary contact name is required');
+        if (!updateData.primaryContactRelationship?.trim()) errors.push('Primary contact relationship is required');
+        if (!validatePhone(updateData.primaryContactPhone)) errors.push('Primary contact phone is invalid');
+        if (errors.length > 0) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            errors
+        }, {
+            status: 400
+        });
+        // ===== UPDATE =====
+        const patient = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.update({
+            where: {
+                id,
+                userId
+            },
+            data: {
+                ...updateData,
+                dateOfBirth: new Date(updateData.dateOfBirth).toISOString(),
+                middleName: updateData.middleName || null,
+                suffix: updateData.suffix || null,
+                email: updateData.email || null,
+                address: updateData.address || null,
+                program: updateData.role === 'student' ? updateData.program : null,
+                course: updateData.role === 'student' ? updateData.course : null,
+                yearLevel: updateData.role === 'student' ? updateData.yearLevel : null,
+                block: updateData.role === 'student' ? updateData.block : null,
+                department: updateData.role === 'teaching_staff' ? updateData.department : null,
+                staffCategory: updateData.role === 'non_teaching_staff' ? updateData.staffCategory : null,
+                pastIllnesses: updateData.pastIllnesses || null,
+                surgeries: updateData.surgeries || null,
+                currentMedication: updateData.currentMedication || null,
+                allergies: updateData.allergies || null,
+                medicalNotes: updateData.medicalNotes || null,
+                primaryContactAddress: updateData.primaryContactAddress || null,
+                secondaryContactName: updateData.secondaryContactName || null,
+                secondaryContactRelationship: updateData.secondaryContactRelationship || null,
+                secondaryContactPhone: updateData.secondaryContactPhone || null,
+                secondaryContactAddress: updateData.secondaryContactAddress || null,
+                attachments: parseAttachments(updateData.attachments)
+            }
+        });
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            patient
+        });
+    } catch (error) {
+        console.error('Update patient error:', error);
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Failed to update patient',
+            details: error.message
+        }, {
+            status: 500
+        });
+    }
+}
+async function DELETE(request) {
+    try {
+        const userId = request.headers.get('x-user-id');
+        if (!userId) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Unauthorized'
+        }, {
+            status: 401
+        });
+        const { id } = await request.json();
+        if (!id) return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Patient ID is required'
+        }, {
+            status: 400
+        });
+        await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.delete({
+            where: {
+                id,
+                userId
+            }
+        });
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            message: 'Patient deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete patient error:', error);
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$8_react$2d$dom$40$19$2e$2$2e$0_react$40$19$2e$2$2e$0_$5f$react$40$19$2e$2$2e$0$2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            error: 'Failed to delete patient',
             details: error.message
         }, {
             status: 500

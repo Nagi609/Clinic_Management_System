@@ -94,9 +94,9 @@ function json(data, status = 200) {
 }
 async function GET(request) {
     try {
-        const userId = request.headers.get('x-user-id');
+        const userId = request.headers.get("x-user-id");
         if (!userId) return json({
-            error: 'Unauthorized'
+            error: "Unauthorized"
         }, 401);
         const visits = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].visitRecord.findMany({
             where: {
@@ -109,12 +109,7 @@ async function GET(request) {
                         firstName: true,
                         middleName: true,
                         lastName: true,
-                        suffix: true,
-                        gender: true,
-                        idNumber: true,
-                        program: true,
-                        course: true,
-                        yearLevel: true
+                        suffix: true
                     }
                 },
                 User: {
@@ -124,46 +119,59 @@ async function GET(request) {
                 }
             },
             orderBy: {
-                createdAt: 'desc'
+                createdAt: "desc"
             }
         });
         return json({
             visits
         });
     } catch (error) {
-        console.error('GET visits error:', error);
+        console.error("GET visits error:", error);
         return json({
-            error: 'Internal server error'
+            error: "Internal server error"
         }, 500);
     }
 }
 async function POST(request) {
     try {
-        const userId = request.headers.get('x-user-id');
+        const userId = request.headers.get("x-user-id");
         if (!userId) return json({
-            error: 'Unauthorized'
+            error: "Unauthorized"
         }, 401);
-        const { patientId, visitDate, reason, symptoms, treatment, notes } = await request.json();
-        if (!patientId || !visitDate || !reason) return json({
-            error: 'Missing required fields'
-        }, 400);
-        // Ensure patient belongs to user
-        const patient = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.findUnique({
-            where: {
-                id: patientId
+        const { patientId, visitorName, visitDate, reason, symptoms, treatment, notes } = await request.json();
+        if (!visitDate || !reason || !symptoms || !treatment) {
+            return json({
+                error: "Missing required fields"
+            }, 400);
+        }
+        // Validate patient ownership if patientId provided
+        if (patientId) {
+            const patient = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.findUnique({
+                where: {
+                    id: patientId
+                }
+            });
+            if (!patient || patient.userId !== userId) {
+                return json({
+                    error: "Patient not found or unauthorized"
+                }, 404);
             }
-        });
-        if (!patient || patient.userId !== userId) return json({
-            error: 'Patient not found or unauthorized'
-        }, 404);
+        }
+        // Walk-in visit requires visitorName
+        if (!patientId && !visitorName) {
+            return json({
+                error: "Either patient selection or visitor name is required"
+            }, 400);
+        }
         const visit = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].visitRecord.create({
             data: {
-                patientId,
+                patientId: patientId ?? null,
+                visitorName: patientId ? null : visitorName ?? null,
                 visitDate,
                 reason,
                 symptoms,
                 treatment,
-                notes,
+                notes: notes ?? null,
                 userId
             }
         });
@@ -171,30 +179,32 @@ async function POST(request) {
             visit
         }, 201);
     } catch (error) {
-        console.error('POST visit error:', error);
+        console.error("POST visit error:", error);
         return json({
-            error: 'Internal server error'
+            error: "Internal server error"
         }, 500);
     }
 }
 async function PUT(request) {
     try {
-        const userId = request.headers.get('x-user-id');
+        const userId = request.headers.get("x-user-id");
         if (!userId) return json({
-            error: 'Unauthorized'
+            error: "Unauthorized"
         }, 401);
-        const { id, patientId, visitDate, reason, symptoms, treatment, notes } = await request.json();
+        const { id, patientId, visitorName, visitDate, reason, symptoms, treatment, notes } = await request.json();
         if (!id) return json({
-            error: 'Visit ID required'
+            error: "Visit ID required"
         }, 400);
         const existing = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].visitRecord.findUnique({
             where: {
                 id
             }
         });
-        if (!existing || existing.userId !== userId) return json({
-            error: 'Visit not found or unauthorized'
-        }, 404);
+        if (!existing || existing.userId !== userId) {
+            return json({
+                error: "Visit not found or unauthorized"
+            }, 404);
+        }
         // Validate patient if changed
         if (patientId && patientId !== existing.patientId) {
             const patient = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].patient.findUnique({
@@ -202,65 +212,68 @@ async function PUT(request) {
                     id: patientId
                 }
             });
-            if (!patient || patient.userId !== userId) return json({
-                error: 'Patient not found or unauthorized'
-            }, 404);
+            if (!patient || patient.userId !== userId) {
+                return json({
+                    error: "Patient not found or unauthorized"
+                }, 404);
+            }
         }
         const updatedVisit = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].visitRecord.update({
             where: {
                 id
             },
             data: {
-                ...patientId && {
-                    patientId
-                },
+                patientId: patientId ?? null,
+                visitorName: patientId ? null : visitorName ?? null,
                 visitDate,
                 reason,
                 symptoms,
                 treatment,
-                notes
+                notes: notes ?? null
             }
         });
         return json({
             visit: updatedVisit
         });
     } catch (error) {
-        console.error('PUT visit error:', error);
+        console.error("PUT visit error:", error);
         return json({
-            error: 'Internal server error'
+            error: "Internal server error"
         }, 500);
     }
 }
 async function DELETE(request) {
     try {
-        const userId = request.headers.get('x-user-id');
+        const userId = request.headers.get("x-user-id");
         if (!userId) return json({
-            error: 'Unauthorized'
+            error: "Unauthorized"
         }, 401);
         const { id } = await request.json();
         if (!id) return json({
-            error: 'Visit ID required'
+            error: "Visit ID required"
         }, 400);
         const visit = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].visitRecord.findUnique({
             where: {
                 id
             }
         });
-        if (!visit || visit.userId !== userId) return json({
-            error: 'Visit not found or unauthorized'
-        }, 404);
+        if (!visit || visit.userId !== userId) {
+            return json({
+                error: "Visit not found or unauthorized"
+            }, 404);
+        }
         await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].visitRecord.delete({
             where: {
                 id
             }
         });
         return json({
-            message: 'Visit deleted'
+            message: "Visit deleted successfully"
         });
     } catch (error) {
-        console.error('DELETE visit error:', error);
+        console.error("DELETE visit error:", error);
         return json({
-            error: 'Internal server error'
+            error: "Internal server error"
         }, 500);
     }
 }

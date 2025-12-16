@@ -41,15 +41,11 @@ export default function LoginPage() {
 
       let data
       const contentType = response.headers.get("content-type")
-      
+
       try {
         data = await response.json()
       } catch (jsonError) {
-        console.error("Failed to parse response as JSON:", {
-          status: response.status,
-          contentType,
-          jsonError
-        })
+        console.error(`Failed to parse response as JSON. Status: ${response.status}, Content-Type: ${contentType}, Error: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`)
         const responseText = await response.text()
         console.error("Response text:", responseText)
         setError("Server error: Invalid response format. Check console for details.")

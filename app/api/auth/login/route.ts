@@ -5,25 +5,25 @@ import bcrypt from 'bcryptjs'
 export async function POST(request: NextRequest) {
   try {
     let body: unknown
-    
+
     try {
       body = await request.json()
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
-      return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
-        { status: 400 }
-      )
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     const { usernameOrEmail, password } = body as { usernameOrEmail?: unknown; password?: unknown }
 
     // Validation
     if (!usernameOrEmail || !password) {
-      return NextResponse.json(
-        { error: 'Username/email and password are required' },
-        { status: 400 }
-      )
+      return new Response(JSON.stringify({ error: 'Username/email and password are required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     // Find user by username or email
@@ -39,17 +39,17 @@ export async function POST(request: NextRequest) {
       })
     } catch (dbError) {
       console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Database connection error' },
-        { status: 500 }
-      )
+      return new Response(JSON.stringify({ error: 'Database connection error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid username/email or password' },
-        { status: 401 }
-      )
+      return new Response(JSON.stringify({ error: 'Invalid username/email or password' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     // Check password
@@ -58,31 +58,31 @@ export async function POST(request: NextRequest) {
       passwordMatch = await bcrypt.compare(String(password), user.password)
     } catch (bcryptError) {
       console.error('Bcrypt error:', bcryptError)
-      return NextResponse.json(
-        { error: 'Password verification failed' },
-        { status: 500 }
-      )
+      return new Response(JSON.stringify({ error: 'Password verification failed' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     if (!passwordMatch) {
-      return NextResponse.json(
-        { error: 'Invalid username/email or password' },
-        { status: 401 }
-      )
+      return new Response(JSON.stringify({ error: 'Invalid username/email or password' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     // Return user data (without password)
     const { password: _, ...userWithoutPassword } = user
-    return NextResponse.json(
-      { user: userWithoutPassword },
-      { status: 200 }
-    )
+    return new Response(JSON.stringify({ user: userWithoutPassword }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
   } catch (error) {
     console.error('Login error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json(
-      { error: `Internal server error: ${errorMessage}` },
-      { status: 500 }
-    )
+    return new Response(JSON.stringify({ error: `Internal server error: ${errorMessage}` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 }

@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ user })
+    const { role, ...userWithoutRole } = user
+    return NextResponse.json({ user: userWithoutRole })
   } catch (error) {
     console.error('Get profile error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, email, password, fullName, role } = await request.json()
+    const { username, email, password, fullName } = await request.json()
 
     // Validation
     if (!username || !email || !password || !fullName) {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         fullName,
-        role: role || 'student',
+        role: 'admin',
       },
     })
 

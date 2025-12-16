@@ -24,9 +24,7 @@ const parseAttachments = (attachments: any) => {
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const patients = await prisma.patient.findMany({
       where: { userId },
@@ -36,10 +34,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ patients })
   } catch (error) {
     console.error('Get patients error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch patients' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 })
   }
 }
 
@@ -47,11 +42,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const data = await request.json()
+
+    // Parse numeric fields
+    data.yearLevel = data.yearLevel ? parseInt(data.yearLevel) : null
+    data.block = data.block ? parseInt(data.block) : null
+
     const errors: string[] = []
 
     // ===== Basic validations =====
@@ -66,9 +64,8 @@ export async function POST(request: NextRequest) {
     if (!data.gender) errors.push('Gender is required')
     if (!validatePhone(data.phone)) errors.push('Phone must start with 09 and be exactly 11 digits')
 
-    if (!data.role || !['student', 'teaching_staff', 'non_teaching_staff'].includes(data.role)) {
+    if (!data.role || !['student', 'teaching_staff', 'non_teaching_staff'].includes(data.role))
       errors.push('Valid role is required')
-    }
 
     if (!validateIdNumber(data.idNumber)) errors.push('Valid ID number is required')
 
@@ -93,15 +90,13 @@ export async function POST(request: NextRequest) {
     if (!data.primaryContactRelationship?.trim()) errors.push('Primary contact relationship is required')
     if (!validatePhone(data.primaryContactPhone)) errors.push('Primary contact phone is invalid')
 
-    if (errors.length > 0) {
-      return NextResponse.json({ errors }, { status: 400 })
-    }
+    if (errors.length > 0) return NextResponse.json({ errors }, { status: 400 })
 
     // ===== CREATE =====
     const patient = await prisma.patient.create({
       data: {
         ...data,
-        dateOfBirth: new Date(data.dateOfBirth), // 🔥 FIX
+        dateOfBirth: new Date(data.dateOfBirth).toISOString(), // ✅ fixed for Prisma string
         middleName: data.middleName || null,
         suffix: data.suffix || null,
         email: data.email || null,
@@ -130,9 +125,117 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ patient }, { status: 201 })
   } catch (error: any) {
     console.error('Create patient error:', error)
-    return NextResponse.json(
-      { error: 'Failed to save patient', details: error.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to save patient', details: error.message }, { status: 500 })
+  }
+}
+
+// ======= PUT - Update patient =======
+export async function PUT(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const data = await request.json()
+    const { id, ...updateData } = data
+
+    // Parse numeric fields
+    updateData.yearLevel = updateData.yearLevel ? parseInt(updateData.yearLevel) : null
+    updateData.block = updateData.block ? parseInt(updateData.block) : null
+
+    const errors: string[] = []
+
+    if (!id) return NextResponse.json({ error: 'Patient ID is required' }, { status: 400 })
+
+    // ===== Basic validations =====
+    if (!validateNameField(updateData.firstName)) errors.push('First name is required and must be letters only')
+    if (updateData.middleName && !validateNameField(updateData.middleName)) errors.push('Middle name must contain letters only')
+    if (!validateNameField(updateData.lastName)) errors.push('Last name is required and must be letters only')
+    if (updateData.suffix && !validateNameField(updateData.suffix)) errors.push('Suffix must contain letters only')
+
+    if (!updateData.dateOfBirth) errors.push('Date of birth is required')
+    if (isNaN(Date.parse(updateData.dateOfBirth))) errors.push('Invalid date of birth')
+
+    if (!updateData.gender) errors.push('Gender is required')
+    if (!validatePhone(updateData.phone)) errors.push('Phone must start with 09 and be exactly 11 digits')
+
+    if (!updateData.role || !['student', 'teaching_staff', 'non_teaching_staff'].includes(updateData.role))
+      errors.push('Valid role is required')
+
+    if (!validateIdNumber(updateData.idNumber)) errors.push('Valid ID number is required')
+
+    // ===== Role-specific =====
+    if (updateData.role === 'student') {
+      if (!['CICT', 'CBME'].includes(updateData.program)) errors.push('Valid program is required for students')
+      if (!updateData.course) errors.push('Course is required for students')
+      if (!updateData.yearLevel || updateData.yearLevel < 1 || updateData.yearLevel > 4) errors.push('Year level must be 1–4')
+      if (updateData.block && (updateData.block < 1 || updateData.block > 5)) errors.push('Block must be 1–5')
+    }
+
+    if (updateData.role === 'teaching_staff') {
+      if (!['CICT', 'CBME'].includes(updateData.department)) errors.push('Valid department is required')
+    }
+
+    if (updateData.role === 'non_teaching_staff') {
+      if (!updateData.staffCategory) errors.push('Staff category is required')
+    }
+
+    // ===== Emergency contact =====
+    if (!updateData.primaryContactName?.trim()) errors.push('Primary contact name is required')
+    if (!updateData.primaryContactRelationship?.trim()) errors.push('Primary contact relationship is required')
+    if (!validatePhone(updateData.primaryContactPhone)) errors.push('Primary contact phone is invalid')
+
+    if (errors.length > 0) return NextResponse.json({ errors }, { status: 400 })
+
+    // ===== UPDATE =====
+    const patient = await prisma.patient.update({
+      where: { id, userId },
+      data: {
+        ...updateData,
+        dateOfBirth: new Date(updateData.dateOfBirth).toISOString(), // ✅ fixed
+        middleName: updateData.middleName || null,
+        suffix: updateData.suffix || null,
+        email: updateData.email || null,
+        address: updateData.address || null,
+        program: updateData.role === 'student' ? updateData.program : null,
+        course: updateData.role === 'student' ? updateData.course : null,
+        yearLevel: updateData.role === 'student' ? updateData.yearLevel : null,
+        block: updateData.role === 'student' ? updateData.block : null,
+        department: updateData.role === 'teaching_staff' ? updateData.department : null,
+        staffCategory: updateData.role === 'non_teaching_staff' ? updateData.staffCategory : null,
+        pastIllnesses: updateData.pastIllnesses || null,
+        surgeries: updateData.surgeries || null,
+        currentMedication: updateData.currentMedication || null,
+        allergies: updateData.allergies || null,
+        medicalNotes: updateData.medicalNotes || null,
+        primaryContactAddress: updateData.primaryContactAddress || null,
+        secondaryContactName: updateData.secondaryContactName || null,
+        secondaryContactRelationship: updateData.secondaryContactRelationship || null,
+        secondaryContactPhone: updateData.secondaryContactPhone || null,
+        secondaryContactAddress: updateData.secondaryContactAddress || null,
+        attachments: parseAttachments(updateData.attachments),
+      },
+    })
+
+    return NextResponse.json({ patient })
+  } catch (error: any) {
+    console.error('Update patient error:', error)
+    return NextResponse.json({ error: 'Failed to update patient', details: error.message }, { status: 500 })
+  }
+}
+
+// ======= DELETE - Delete patient =======
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = await request.json()
+    if (!id) return NextResponse.json({ error: 'Patient ID is required' }, { status: 400 })
+
+    await prisma.patient.delete({ where: { id, userId } })
+    return NextResponse.json({ message: 'Patient deleted successfully' })
+  } catch (error: any) {
+    console.error('Delete patient error:', error)
+    return NextResponse.json({ error: 'Failed to delete patient', details: error.message }, { status: 500 })
   }
 }

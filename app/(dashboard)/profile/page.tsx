@@ -11,7 +11,6 @@ interface ProfileData {
   id?: string
   fullName: string
   email: string
-  role: string
   phone: string
   address: string
   avatar?: string
@@ -21,7 +20,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>({
     fullName: "",
     email: "",
-    role: "",
     phone: "",
     address: "",
   })
@@ -55,7 +53,6 @@ export default function ProfilePage() {
           id: data.user.id,
           fullName: data.user.fullName,
           email: data.user.email,
-          role: data.user.role,
           phone: data.user.phone || "",
           address: data.user.address || "",
           avatar: data.user.avatar || undefined,
@@ -140,7 +137,6 @@ export default function ProfilePage() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">{profile.fullName}</h2>
-                <p className="text-gray-600 capitalize">{profile.role}</p>
               </div>
             </div>
 
@@ -169,26 +165,15 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Role</label>
-                  <input
-                    type="text"
-                    value={profile.role}
-                    disabled
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Phone</label>
-                  <input
-                    type="text"
-                    value={profile.phone}
-                    onChange={(e) => handleInputChange("phone", e.target.value)}
-                    disabled={!editing}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Phone</label>
+                <input
+                  type="text"
+                  value={profile.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  disabled={!editing}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50"
+                />
               </div>
 
               <div>

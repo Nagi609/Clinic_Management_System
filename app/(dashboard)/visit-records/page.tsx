@@ -1,15 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { LayoutWrapper } from "@/components/layout-wrapper"
 import { Plus, Search, Calendar, User, FileText, X, Edit2, Trash2 } from "lucide-react"
 import { getCurrentUser, checkPermission } from "@/lib/constants"
 import { logActivity } from "@/lib/utils"
 
+interface Patient {
+  id: string
+  name: string
+}
+
 interface VisitRecord {
   id: string
-  patientId: string
+  patientId?: string
   patientName: string
   visitDate: string
   reason: string
@@ -18,20 +23,16 @@ interface VisitRecord {
   notes?: string
 }
 
-interface Patient {
-  id: string
-  name: string
-}
-
 export default function VisitRecordsPage() {
   const [visits, setVisits] = useState<VisitRecord[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
+  const [patientSuggestions, setPatientSuggestions] = useState<Patient[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("date")
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newVisit, setNewVisit] = useState<Partial<VisitRecord>>({
-    patientId: "",
+    patientName: "",
     visitDate: new Date().toISOString().split("T")[0],
     reason: "",
     symptoms: "",
@@ -43,6 +44,8 @@ export default function VisitRecordsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const suggestionRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     const currentUser = getCurrentUser()
     if (currentUser) setUser(currentUser)
@@ -50,26 +53,11 @@ export default function VisitRecordsPage() {
 
   useEffect(() => {
     if (user) {
-      fetchPatients()
       fetchVisits()
     }
   }, [user])
 
-  const fetchPatients = async () => {
-    if (!user) return
-    try {
-      const response = await fetch("/api/patients", {
-        headers: { "x-user-id": user.id },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPatients(data.patients || [])
-      }
-    } catch (error) {
-      console.error("Error fetching patients:", error)
-    }
-  }
-
+  // ------------------- FETCH VISITS -------------------
   const fetchVisits = async () => {
     if (!user) return
     try {
@@ -83,7 +71,9 @@ export default function VisitRecordsPage() {
           data.visits?.map((v: any) => ({
             id: v.id,
             patientId: v.patientId,
-            patientName: v.patient?.name || "Unknown Patient",
+            patientName: v.Patient
+              ? `${v.Patient.firstName} ${v.Patient.middleName ?? ""} ${v.Patient.lastName}${v.Patient.suffix ? " " + v.Patient.suffix : ""}`.trim()
+              : v.visitorName || "Unknown Patient",
             visitDate: v.visitDate,
             reason: v.reason,
             symptoms: v.symptoms,
@@ -101,6 +91,142 @@ export default function VisitRecordsPage() {
 
   const canManageVisits = user && checkPermission(user.role, "canManagePatients")
 
+  // ------------------- PATIENT AUTOCOMPLETE -------------------
+  useEffect(() => {
+    if (!newVisit.patientName) {
+      setPatientSuggestions([])
+      return
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/patients?search=${encodeURIComponent(newVisit.patientName)}`, {
+          headers: { "x-user-id": user.id },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const suggestions: Patient[] = data.patients.map((p: any) => ({
+            id: p.id,
+            name: `${p.firstName} ${p.middleName ?? ""} ${p.lastName}${p.suffix ? " " + p.suffix : ""}`.trim(),
+          }))
+          setPatientSuggestions(suggestions)
+        }
+      } catch (err) {
+        console.error("Error fetching patient suggestions:", err)
+      }
+    }, 300) // debounce 300ms
+    return () => clearTimeout(delayDebounce)
+  }, [newVisit.patientName])
+
+  const handleSelectPatient = (patient: Patient) => {
+    setNewVisit({ ...newVisit, patientId: patient.id, patientName: patient.name })
+    setPatientSuggestions([])
+  }
+
+  // ------------------- ADD / UPDATE VISIT -------------------
+  const handleAddVisit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!canManageVisits || isSubmitting) return
+
+    setIsSubmitting(true)
+    const errors: string[] = []
+
+    if (!newVisit.patientId?.trim()) errors.push("Patient selection is required")
+    if (!newVisit.visitDate) errors.push("Visit date is required")
+    if (!newVisit.reason?.trim()) errors.push("Reason for visit is required")
+    if (!newVisit.symptoms?.trim()) errors.push("Symptoms description is required")
+    if (!newVisit.treatment?.trim()) errors.push("Treatment information is required")
+
+    if (errors.length > 0) {
+      setFormErrors(errors)
+      setIsSubmitting(false)
+      return
+    }
+
+    try {
+      if (editingId) {
+        // Update
+        const res = await fetch("/api/visits", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "x-user-id": user.id },
+          body: JSON.stringify({
+            id: editingId,
+            patientId: newVisit.patientId,
+            visitDate: newVisit.visitDate,
+            reason: newVisit.reason,
+            symptoms: newVisit.symptoms,
+            treatment: newVisit.treatment,
+            notes: newVisit.notes,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          setFormErrors([err.error || "Failed to update visit"])
+          return
+        }
+      } else {
+        // Create
+        const res = await fetch("/api/visits", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-user-id": user.id },
+          body: JSON.stringify({
+            patientId: newVisit.patientId,
+            visitDate: newVisit.visitDate,
+            reason: newVisit.reason,
+            symptoms: newVisit.symptoms,
+            treatment: newVisit.treatment,
+            notes: newVisit.notes,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          setFormErrors([err.error || "Failed to save visit"])
+          return
+        }
+      }
+
+      await fetchVisits()
+      setShowAddForm(false)
+      setEditingId(null)
+      setNewVisit({
+        patientName: "",
+        visitDate: new Date().toISOString().split("T")[0],
+        reason: "",
+        symptoms: "",
+        treatment: "",
+        notes: "",
+      })
+      setFormErrors([])
+    } catch (err) {
+      console.error("Error saving visit:", err)
+      setFormErrors(["Failed to save visit."])
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // ------------------- EDIT / DELETE -------------------
+  const handleEditVisit = (visit: VisitRecord) => {
+    if (!canManageVisits) return
+    setEditingId(visit.id)
+    setNewVisit({ ...visit })
+    setShowAddForm(true)
+  }
+
+  const handleDeleteVisit = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this visit record?")) return
+    try {
+      const res = await fetch("/api/visits", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ id }),
+      })
+      if (res.ok) await fetchVisits()
+    } catch (err) {
+      console.error("Error deleting visit:", err)
+    }
+  }
+
+  // ------------------- FILTER / SORT -------------------
   const filteredVisits = visits
     .filter(
       (v) =>
@@ -114,106 +240,10 @@ export default function VisitRecordsPage() {
       return 0
     })
 
-  const handleAddVisit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!canManageVisits || isSubmitting) return
-
-    setIsSubmitting(true)
-
-    const errors: string[] = []
-    if (!newVisit.patientId?.trim()) errors.push("Patient selection is required")
-    if (!newVisit.visitDate) errors.push("Visit date is required")
-    if (!newVisit.reason?.trim()) errors.push("Reason for visit is required")
-    if (!newVisit.symptoms?.trim()) errors.push("Symptoms description is required")
-    if (!newVisit.treatment?.trim()) errors.push("Treatment information is required")
-
-    // Validate date format
-    if (newVisit.visitDate) {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-      if (!dateRegex.test(newVisit.visitDate)) {
-        errors.push("Invalid date format")
-      }
-    }
-
-    if (errors.length > 0) {
-      setFormErrors(errors)
-      return
-    }
-
-    try {
-      if (editingId) {
-        const response = await fetch("/api/visits", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", "x-user-id": user.id },
-          body: JSON.stringify({ id: editingId, ...newVisit }),
-        })
-        if (response.ok) {
-          logActivity("visit", `Updated visit record`)
-          await fetchVisits()
-          setEditingId(null)
-        } else {
-          const errorData = await response.json()
-          setFormErrors([errorData.error || "Failed to update visit"])
-        }
-      } else {
-        const selectedPatient = patients.find((p) => p.id === newVisit.patientId)
-        const response = await fetch("/api/visits", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-user-id": user.id },
-          body: JSON.stringify(newVisit),
-        })
-        if (response.ok) {
-          logActivity("visit", `Added new visit for ${selectedPatient?.name}`)
-          await fetchVisits()
-        } else {
-          const errorData = await response.json()
-          setFormErrors([errorData.error || "Failed to save visit"])
-        }
-      }
-
-      setNewVisit({
-        patientId: "",
-        visitDate: new Date().toISOString().split("T")[0],
-        reason: "",
-        symptoms: "",
-        treatment: "",
-        notes: "",
-      })
-      setShowAddForm(false)
-      setFormErrors([])
-    } catch (error) {
-      console.error("Error saving visit:", error)
-      setFormErrors(["Failed to save visit. Please try again."])
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleEditVisit = (visit: VisitRecord) => {
-    if (!canManageVisits) return
-    setEditingId(visit.id)
-    setNewVisit({ ...visit })
-    setShowAddForm(true)
-  }
-
-  const handleDeleteVisit = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this visit record?")) return
-    try {
-      const response = await fetch("/api/visits", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", "x-user-id": user.id },
-        body: JSON.stringify({ id }),
-      })
-      if (response.ok) await fetchVisits()
-    } catch (error) {
-      console.error("Error deleting visit:", error)
-    }
-  }
-
   return (
     <LayoutWrapper>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header & Add Button */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-[#8B3A3A]">Visit Records</h1>
@@ -225,7 +255,7 @@ export default function VisitRecordsPage() {
                 setShowAddForm(true)
                 setEditingId(null)
                 setNewVisit({
-                  patientId: "",
+                  patientName: "",
                   visitDate: new Date().toISOString().split("T")[0],
                   reason: "",
                   symptoms: "",
@@ -240,9 +270,9 @@ export default function VisitRecordsPage() {
           )}
         </div>
 
-        {/* Add Visit Form */}
+        {/* Add Form */}
         {showAddForm && canManageVisits && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-[#8B3A3A]">
                 {editingId ? "Edit Visit Record" : "New Visit Record"}
@@ -262,50 +292,60 @@ export default function VisitRecordsPage() {
             {formErrors.length > 0 && (
               <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <ul className="list-disc list-inside text-red-600">
-                  {formErrors.map((error, idx) => (
-                    <li key={idx}>{error}</li>
+                  {formErrors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
                   ))}
                 </ul>
               </div>
             )}
 
             <form onSubmit={handleAddVisit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Patient *
-                  </label>
-                  <select
-                    value={newVisit.patientId || ""}
-                    onChange={(e) =>
-                      setNewVisit({ ...newVisit, patientId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Patient Name *
+                </label>
+                <input
+                  type="text"
+                  value={newVisit.patientName || ""}
+                  onChange={(e) =>
+                    setNewVisit({ ...newVisit, patientName: e.target.value, patientId: "" })
+                  }
+                  placeholder="Enter patient name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
+                />
+                {/* Suggestions */}
+                {patientSuggestions.length > 0 && (
+                  <div
+                    ref={suggestionRef}
+                    className="absolute z-50 bg-white border border-gray-300 w-full mt-1 rounded-md shadow-md max-h-60 overflow-y-auto"
                   >
-                    <option value="">Select a patient</option>
-                    {patients.map((p) => (
-                      <option key={p.id} value={p.id}>
+                    {patientSuggestions.map((p) => (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectPatient(p)}
+                        className="px-3 py-2 hover:bg-[#8B3A3A] hover:text-white cursor-pointer"
+                      >
                         {p.name}
-                      </option>
+                      </div>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Visit Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={newVisit.visitDate || ""}
-                    onChange={(e) =>
-                      setNewVisit({ ...newVisit, visitDate: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
-                  />
-                </div>
+                  </div>
+                )}
               </div>
 
+              {/* Visit Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Visit Date *
+                </label>
+                <input
+                  type="date"
+                  value={newVisit.visitDate || ""}
+                  onChange={(e) => setNewVisit({ ...newVisit, visitDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
+                />
+              </div>
+
+              {/* Reason */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reason for Visit *
@@ -313,59 +353,55 @@ export default function VisitRecordsPage() {
                 <input
                   type="text"
                   value={newVisit.reason || ""}
-                  onChange={(e) =>
-                    setNewVisit({ ...newVisit, reason: e.target.value })
-                  }
+                  onChange={(e) => setNewVisit({ ...newVisit, reason: e.target.value })}
                   placeholder="e.g., Check-up, Follow-up, Emergency"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
                 />
               </div>
 
+              {/* Symptoms */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Symptoms *
                 </label>
                 <textarea
                   value={newVisit.symptoms || ""}
-                  onChange={(e) =>
-                    setNewVisit({ ...newVisit, symptoms: e.target.value })
-                  }
-                  placeholder="Describe the patient's symptoms..."
+                  onChange={(e) => setNewVisit({ ...newVisit, symptoms: e.target.value })}
                   rows={3}
+                  placeholder="Describe the patient's symptoms..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
                 />
               </div>
 
+              {/* Treatment */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Treatment *
                 </label>
                 <textarea
                   value={newVisit.treatment || ""}
-                  onChange={(e) =>
-                    setNewVisit({ ...newVisit, treatment: e.target.value })
-                  }
-                  placeholder="Describe the treatment provided..."
+                  onChange={(e) => setNewVisit({ ...newVisit, treatment: e.target.value })}
                   rows={3}
+                  placeholder="Describe the treatment provided..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
                 />
               </div>
 
+              {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Notes (Optional)
                 </label>
                 <textarea
                   value={newVisit.notes || ""}
-                  onChange={(e) =>
-                    setNewVisit({ ...newVisit, notes: e.target.value })
-                  }
-                  placeholder="Any additional notes..."
+                  onChange={(e) => setNewVisit({ ...newVisit, notes: e.target.value })}
                   rows={2}
+                  placeholder="Any additional notes..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
                 />
               </div>
 
+              {/* Buttons */}
               <div className="flex gap-3 justify-end pt-4">
                 <button
                   type="button"
@@ -413,76 +449,50 @@ export default function VisitRecordsPage() {
           </select>
         </div>
 
-        {/* Visit Records List */}
+        {/* Visit List */}
         <div className="space-y-4">
           {filteredVisits.length > 0 ? (
             filteredVisits.map((visit) => (
-              <div key={visit.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                <div className="bg-[#8B3A3A] text-white p-6">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <User size={18} />
-                        <p className="text-sm font-semibold opacity-90">Patient</p>
-                      </div>
-                      <p className="text-xl font-bold">{visit.patientName}</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calendar size={18} />
-                        <p className="text-sm font-semibold opacity-90">Visit Date</p>
-                      </div>
-                      <p className="text-xl font-bold">{new Date(visit.visitDate).toLocaleDateString()}</p>
-                    </div>
-                  </div>
+              <div
+                key={visit.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+              >
+                <div className="bg-[#8B3A3A] text-white p-6 flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold opacity-90 mb-1">Reason</p>
-                    <p className="text-lg">{visit.reason}</p>
+                    <h3 className="text-xl font-bold">{visit.patientName}</h3>
+                    <p className="text-sm">{visit.visitDate}</p>
                   </div>
-                </div>
-                <div className="p-6 bg-gray-50 border-t border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-2">Symptoms</p>
-                      <p className="text-gray-700">{visit.symptoms}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-2">Treatment</p>
-                      <p className="text-gray-700">{visit.treatment}</p>
-                    </div>
-                  </div>
-                  {visit.notes && (
-                    <div className="mb-4">
-                      <p className="text-sm font-semibold text-gray-600 mb-2">Notes</p>
-                      <p className="text-gray-700">{visit.notes}</p>
+                  {canManageVisits && (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditVisit(visit)}>
+                        <Edit2 size={18} className="hover:text-gray-200" />
+                      </button>
+                      <button onClick={() => handleDeleteVisit(visit.id)}>
+                        <Trash2 size={18} className="hover:text-gray-200" />
+                      </button>
                     </div>
                   )}
-                  {canManageVisits && (
-                    <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
-                      <button
-                        onClick={() => handleEditVisit(visit)}
-                        className="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteVisit(visit.id)}
-                        className="bg-red-600 text-white px-2 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                </div>
+                <div className="p-6 space-y-2">
+                  <p>
+                    <span className="font-semibold">Reason:</span> {visit.reason}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Symptoms:</span> {visit.symptoms}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Treatment:</span> {visit.treatment}
+                  </p>
+                  {visit.notes && (
+                    <p>
+                      <span className="font-semibold">Notes:</span> {visit.notes}
+                    </p>
                   )}
                 </div>
               </div>
             ))
           ) : (
-            <div className="bg-white rounded-xl p-12 text-center">
-              <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 text-lg">No visit records found</p>
-            </div>
+            <p className="text-gray-500 text-center py-6">No visit records found.</p>
           )}
         </div>
       </div>

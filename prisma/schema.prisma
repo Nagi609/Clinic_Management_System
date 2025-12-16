@@ -144,19 +144,20 @@ model Activity {
 // ─── VISIT RECORD MODEL ───────────────────────────────────────────────────────
 //
 model VisitRecord {
-  id        String   @id @default(cuid())
-  patientId String
-  userId    String
+  id         String   @id @default(cuid())
+  patientId  String?
+  visitorName String?
+  userId     String
 
-  visitDate String
-  reason    String
-  symptoms  String
-  treatment String
-  notes     String?
+  visitDate  String
+  reason     String
+  symptoms   String
+  treatment  String
+  notes      String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  Patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Patient    Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

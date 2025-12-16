@@ -16,7 +16,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [userRole, setUserRole] = useState("admin")
+
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -104,7 +104,7 @@ export default function SignupPage() {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, fullName, email, password, role: userRole }),
+        body: JSON.stringify({ username, fullName, email, password }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -212,21 +212,7 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* User Role Selection */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">User Role</label>
-              <div className="relative">
-                <select
-                  value={userRole}
-                  onChange={(e) => setUserRole(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-[#8B3A3A] rounded-lg focus:outline-none appearance-none bg-white cursor-pointer"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="user">User</option>
-                </select>
-                <ChevronDown className="absolute right-4 top-3 text-[#8B3A3A] pointer-events-none" size={20} />
-              </div>
-            </div>
+
 
             <button
               type="submit"
