@@ -23,6 +23,18 @@
       }
     ],
     "paths": {
+      "@/components/*": [
+        "./frontend/components/*"
+      ],
+      "@/hooks/*": [
+        "./frontend/hooks/*"
+      ],
+      "@/lib/db": [
+        "./backend/lib/db.ts"
+      ],
+      "@/lib/*": [
+        "./frontend/lib/*"
+      ],
       "@/*": [
         "./*"
       ]
