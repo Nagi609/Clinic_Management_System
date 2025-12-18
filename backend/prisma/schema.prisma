@@ -4,14 +4,14 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./prisma/dev.db"
+  url      = env("DATABASE_URL")
 }
 
 //
 // ─── PATIENT MODEL ─────────────────────────────────────────────────────────────
 //
 model Patient {
-  id                Int           @id
+  id                String        @id @default(cuid())
 
   // Personal Information
   firstName         String
@@ -145,8 +145,8 @@ model Activity {
 // ─── VISIT RECORD MODEL ───────────────────────────────────────────────────────
 //
 model VisitRecord {
-  id         Int      @id
-  patientId  Int?
+  id         String   @id @default(cuid())
+  patientId  String?
   visitorName String?
   userId     String
 

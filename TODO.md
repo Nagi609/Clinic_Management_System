@@ -1,5 +1,0 @@
-- [x] Add validateEmail helper function in backend (app/api/patients/route.ts)
-- [x] Update POST endpoint to validate email if provided
-- [x] Update PUT endpoint to validate email if provided
-- [x] Update frontend validateForm function to check email format if entered (app/(dashboard)/patients/page.tsx)
-- [ ] Test validation by submitting forms with invalid emails
