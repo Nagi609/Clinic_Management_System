@@ -41,7 +41,19 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user
+    // Determine smallest available positive numericId (ignore 0)
+    const existingIds = await prisma.user.findMany({
+      where: { numericId: { gt: 0 } },
+      select: { numericId: true },
+      orderBy: { numericId: 'asc' },
+    })
+    let nextNumericId = 1
+    for (const row of existingIds) {
+      if (row.numericId === nextNumericId) nextNumericId++
+      else if (row.numericId > nextNumericId) break
+    }
+
+    // Create user with assigned numericId
     const user = await prisma.user.create({
       data: {
         username,
@@ -49,6 +61,7 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         fullName,
         role: 'admin',
+        numericId: nextNumericId,
       },
     })
 

@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 
-// ======= Validation Helpers =======
-const validateNameField = (name: string): boolean =>
-  !!name?.trim() && /^[a-zA-Z\s]*$/.test(name.trim())
+// Validation helpers
+const validateNameField = (name: string): boolean => {
+  if (!name || !name.trim()) return false
+  return /^[a-zA-Z\s]*$/.test(name.trim())
+}
 
-const validatePhone = (phone: string): boolean =>
-  typeof phone === 'string' && /^09\d{9}$/.test(phone)
+const validatePhone = (phone: string): boolean => {
+  // Must start with 09 and be exactly 11 digits
+  return /^09\d{9}$/.test(phone)
+}
 
-const validateIdNumber = (idNumber: string): boolean =>
-  typeof idNumber === 'string' && /^[a-zA-Z0-9-]+$/.test(idNumber)
+const validateIdNumber = (idNumber: string): boolean => {
+  // Can contain letters, numbers, and dash only
+  return /^[a-zA-Z0-9-]+$/.test(idNumber)
+}
 
+const validateEmail = (email: string): boolean => {
+  // Basic email regex pattern
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+// Helper to parse attachments safely
 const parseAttachments = (attachments: any) => {
   if (!attachments) return null
   try {
@@ -20,222 +32,337 @@ const parseAttachments = (attachments: any) => {
   }
 }
 
-// ======= GET - All patients =======
+// GET all patients for the current user
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search')
 
     const patients = await prisma.patient.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json({ patients })
+    let filteredPatients = patients
+
+    if (search && search.trim()) {
+      const searchTerm = search.trim().toLowerCase()
+      filteredPatients = patients.filter(patient => {
+        const fullName = `${patient.firstName} ${patient.middleName ?? ""} ${patient.lastName}${patient.suffix ? " " + patient.suffix : ""}`.toLowerCase().trim()
+        return fullName.includes(searchTerm) ||
+               patient.firstName.toLowerCase().includes(searchTerm) ||
+               (patient.middleName && patient.middleName.toLowerCase().includes(searchTerm)) ||
+               patient.lastName.toLowerCase().includes(searchTerm) ||
+               (patient.suffix && patient.suffix.toLowerCase().includes(searchTerm))
+      })
+    }
+
+    return NextResponse.json({ patients: filteredPatients })
   } catch (error) {
     console.error('Get patients error:', error)
-    return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// ======= POST - Create patient =======
+// POST - Create a new patient
 export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const data = await request.json()
+    const {
+      firstName,
+      middleName,
+      lastName,
+      suffix,
+      dateOfBirth,
+      gender,
+      phone,
+      email,
+      address,
+      role,
+      idNumber,
+      program,
+      course,
+      yearLevel,
+      block,
+      department,
+      staffCategory,
+      // Medical History
+      pastIllnesses,
+      surgeries,
+      currentMedication,
+      allergies,
+      medicalNotes,
+      // Emergency Contacts
+      primaryContactName,
+      primaryContactRelationship,
+      primaryContactPhone,
+      primaryContactAddress,
+      secondaryContactName,
+      secondaryContactRelationship,
+      secondaryContactPhone,
+      secondaryContactAddress,
+      attachments
+    } = await request.json()
 
-    // Parse numeric fields
-    data.yearLevel = data.yearLevel ? parseInt(data.yearLevel) : null
-    data.block = data.block ? parseInt(data.block) : null
-
+    // Validate required fields
     const errors: string[] = []
 
-    // ===== Basic validations =====
-    if (!validateNameField(data.firstName)) errors.push('First name is required and must be letters only')
-    if (data.middleName && !validateNameField(data.middleName)) errors.push('Middle name must contain letters only')
-    if (!validateNameField(data.lastName)) errors.push('Last name is required and must be letters only')
-    if (data.suffix && !validateNameField(data.suffix)) errors.push('Suffix must contain letters only')
-
-    if (!data.dateOfBirth) errors.push('Date of birth is required')
-    if (isNaN(Date.parse(data.dateOfBirth))) errors.push('Invalid date of birth')
-
-    if (!data.gender) errors.push('Gender is required')
-    if (!validatePhone(data.phone)) errors.push('Phone must start with 09 and be exactly 11 digits')
-
-    if (!data.role || !['student', 'teaching_staff', 'non_teaching_staff'].includes(data.role))
+    if (!firstName || !validateNameField(firstName)) {
+      errors.push('First name is required and must contain only letters')
+    }
+    if (middleName && !validateNameField(middleName)) {
+      errors.push('Middle name must contain only letters')
+    }
+    if (!lastName || !validateNameField(lastName)) {
+      errors.push('Last name is required and must contain only letters')
+    }
+    if (suffix && !validateNameField(suffix)) {
+      errors.push('Suffix must contain only letters')
+    }
+    if (!dateOfBirth) {
+      errors.push('Date of birth is required')
+    }
+    if (!gender) {
+      errors.push('Gender is required')
+    }
+    if (!phone || !validatePhone(phone)) {
+      errors.push('Phone must start with 09 and be exactly 11 digits')
+    }
+    if (!role || !['student', 'teaching_staff', 'non_teaching_staff'].includes(role)) {
       errors.push('Valid role is required')
-
-    if (!validateIdNumber(data.idNumber)) errors.push('Valid ID number is required')
-
-    // ===== Role-specific =====
-    if (data.role === 'student') {
-      if (!['CICT', 'CBME'].includes(data.program)) errors.push('Valid program is required for students')
-      if (!data.course) errors.push('Course is required for students')
-      if (!data.yearLevel || data.yearLevel < 1 || data.yearLevel > 4) errors.push('Year level must be 1–4')
-      if (data.block && (data.block < 1 || data.block > 5)) errors.push('Block must be 1–5')
+    }
+    if (!idNumber || !validateIdNumber(idNumber)) {
+      errors.push('ID number is required and can only contain letters, numbers, and dashes')
     }
 
-    if (data.role === 'teaching_staff') {
-      if (!['CICT', 'CBME'].includes(data.department)) errors.push('Valid department is required')
+    // Validate role-specific fields
+    if (role === 'student') {
+      if (!program || !['CICT', 'CBME'].includes(program)) {
+        errors.push('Valid program (CICT or CBME) is required for students')
+      }
+      if (!course) {
+        errors.push('Course is required for students')
+      }
+      if (!yearLevel || yearLevel < 1 || yearLevel > 4) {
+        errors.push('Valid year level (1-4) is required for students')
+      }
+      if (!block || block < 1 || block > 5) {
+        errors.push('Valid block (1-5) is required for students')
+      }
     }
 
-    if (data.role === 'non_teaching_staff') {
-      if (!data.staffCategory) errors.push('Staff category is required')
+    if (role === 'teaching_staff') {
+      if (!department || !['CICT', 'CBME'].includes(department)) {
+        errors.push('Valid program (CICT or CBME) is required for teaching staff')
+      }
     }
 
-    // ===== Emergency contact =====
-    if (!data.primaryContactName?.trim()) errors.push('Primary contact name is required')
-    if (!data.primaryContactRelationship?.trim()) errors.push('Primary contact relationship is required')
-    if (!validatePhone(data.primaryContactPhone)) errors.push('Primary contact phone is invalid')
+    if (role === 'non_teaching_staff') {
+      if (!staffCategory || !['Administrative', 'Security', 'Maintenance', 'Support', 'Clinic'].includes(staffCategory)) {
+        errors.push('Valid category is required for non-teaching staff')
+      }
+    }
 
-    if (errors.length > 0) return NextResponse.json({ errors }, { status: 400 })
+    // Validate primary emergency contact (required)
+    if (!primaryContactName || !primaryContactName.trim()) {
+      errors.push('Primary contact name is required')
+    }
+    if (!primaryContactRelationship || !primaryContactRelationship.trim()) {
+      errors.push('Primary contact relationship is required')
+    }
+    if (!primaryContactPhone || !validatePhone(primaryContactPhone)) {
+      errors.push('Primary contact phone must start with 09 and be exactly 11 digits')
+    }
 
-    // ===== CREATE =====
+    if (errors.length > 0) {
+      return NextResponse.json({ errors }, { status: 400 })
+    }
+
     const patient = await prisma.patient.create({
       data: {
-        ...data,
-        dateOfBirth: new Date(data.dateOfBirth).toISOString(), // ✅ fixed for Prisma string
-        middleName: data.middleName || null,
-        suffix: data.suffix || null,
-        email: data.email || null,
-        address: data.address || null,
-        program: data.role === 'student' ? data.program : null,
-        course: data.role === 'student' ? data.course : null,
-        yearLevel: data.role === 'student' ? data.yearLevel : null,
-        block: data.role === 'student' ? data.block : null,
-        department: data.role === 'teaching_staff' ? data.department : null,
-        staffCategory: data.role === 'non_teaching_staff' ? data.staffCategory : null,
-        pastIllnesses: data.pastIllnesses || null,
-        surgeries: data.surgeries || null,
-        currentMedication: data.currentMedication || null,
-        allergies: data.allergies || null,
-        medicalNotes: data.medicalNotes || null,
-        primaryContactAddress: data.primaryContactAddress || null,
-        secondaryContactName: data.secondaryContactName || null,
-        secondaryContactRelationship: data.secondaryContactRelationship || null,
-        secondaryContactPhone: data.secondaryContactPhone || null,
-        secondaryContactAddress: data.secondaryContactAddress || null,
-        attachments: parseAttachments(data.attachments),
-        userId,
-      },
+        firstName,
+        middleName: middleName || null,
+        lastName,
+        suffix: suffix || null,
+        dateOfBirth,
+        gender,
+        phone,
+        email: email || null,
+        address: address || null,
+        role,
+        idNumber,
+        program: role === 'student' ? program : null,
+        course: role === 'student' ? course : null,
+        yearLevel: role === 'student' ? yearLevel : null,
+        block: role === 'student' ? block : null,
+        department: role === 'teaching_staff' ? department : null,
+        staffCategory: role === 'non_teaching_staff' ? staffCategory : null,
+        // Medical History
+        pastIllnesses: pastIllnesses || null,
+        surgeries: surgeries || null,
+        currentMedication: currentMedication || null,
+        allergies: allergies || null,
+        medicalNotes: medicalNotes || null,
+        // Emergency Contacts
+        primaryContactName,
+        primaryContactRelationship,
+        primaryContactPhone,
+        primaryContactAddress: primaryContactAddress || null,
+        secondaryContactName: secondaryContactName || null,
+        secondaryContactRelationship: secondaryContactRelationship || null,
+        secondaryContactPhone: secondaryContactPhone || null,
+        secondaryContactAddress: secondaryContactAddress || null,
+        attachments: parseAttachments(attachments),
+        userId
+      }
     })
 
     return NextResponse.json({ patient }, { status: 201 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Create patient error:', error)
-    return NextResponse.json({ error: 'Failed to save patient', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// ======= PUT - Update patient =======
+// PUT - Update a patient
 export async function PUT(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id')
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const data = await request.json()
-    const { id, ...updateData } = data
+    const {
+      id,
+      firstName,
+      middleName,
+      lastName,
+      suffix,
+      dateOfBirth,
+      gender,
+      phone,
+      email,
+      address,
+      role,
+      idNumber,
+      program,
+      course,
+      yearLevel,
+      block,
+      department,
+      staffCategory,
+      // Medical History
+      pastIllnesses,
+      surgeries,
+      currentMedication,
+      allergies,
+      medicalNotes,
+      // Emergency Contacts
+      primaryContactName,
+      primaryContactRelationship,
+      primaryContactPhone,
+      primaryContactAddress,
+      secondaryContactName,
+      secondaryContactRelationship,
+      secondaryContactPhone,
+      secondaryContactAddress,
+      attachments
+    } = await request.json()
 
-    // Parse numeric fields
-    updateData.yearLevel = updateData.yearLevel ? parseInt(updateData.yearLevel) : null
-    updateData.block = updateData.block ? parseInt(updateData.block) : null
+    if (!id) return NextResponse.json({ error: 'Patient ID required' }, { status: 400 })
 
+    const patient = await prisma.patient.findUnique({ where: { id } })
+    if (!patient || patient.userId !== userId) {
+      return NextResponse.json({ error: 'Patient not found or unauthorized' }, { status: 404 })
+    }
+
+    // Validate fields if provided
     const errors: string[] = []
 
-    if (!id) return NextResponse.json({ error: 'Patient ID is required' }, { status: 400 })
-
-    // ===== Basic validations =====
-    if (!validateNameField(updateData.firstName)) errors.push('First name is required and must be letters only')
-    if (updateData.middleName && !validateNameField(updateData.middleName)) errors.push('Middle name must contain letters only')
-    if (!validateNameField(updateData.lastName)) errors.push('Last name is required and must be letters only')
-    if (updateData.suffix && !validateNameField(updateData.suffix)) errors.push('Suffix must contain letters only')
-
-    if (!updateData.dateOfBirth) errors.push('Date of birth is required')
-    if (isNaN(Date.parse(updateData.dateOfBirth))) errors.push('Invalid date of birth')
-
-    if (!updateData.gender) errors.push('Gender is required')
-    if (!validatePhone(updateData.phone)) errors.push('Phone must start with 09 and be exactly 11 digits')
-
-    if (!updateData.role || !['student', 'teaching_staff', 'non_teaching_staff'].includes(updateData.role))
-      errors.push('Valid role is required')
-
-    if (!validateIdNumber(updateData.idNumber)) errors.push('Valid ID number is required')
-
-    // ===== Role-specific =====
-    if (updateData.role === 'student') {
-      if (!['CICT', 'CBME'].includes(updateData.program)) errors.push('Valid program is required for students')
-      if (!updateData.course) errors.push('Course is required for students')
-      if (!updateData.yearLevel || updateData.yearLevel < 1 || updateData.yearLevel > 4) errors.push('Year level must be 1–4')
-      if (updateData.block && (updateData.block < 1 || updateData.block > 5)) errors.push('Block must be 1–5')
+    if (firstName && !validateNameField(firstName)) {
+      errors.push('First name must contain only letters')
+    }
+    if (middleName && !validateNameField(middleName)) {
+      errors.push('Middle name must contain only letters')
+    }
+    if (lastName && !validateNameField(lastName)) {
+      errors.push('Last name must contain only letters')
+    }
+    if (suffix && !validateNameField(suffix)) {
+      errors.push('Suffix must contain only letters')
+    }
+    if (phone && !validatePhone(phone)) {
+      errors.push('Phone must start with 09 and be exactly 11 digits')
+    }
+    if (email && !validateEmail(email)) {
+      errors.push('Email must be a valid email address')
+    }
+    if (idNumber && !validateIdNumber(idNumber)) {
+      errors.push('ID number can only contain letters, numbers, and dashes')
     }
 
-    if (updateData.role === 'teaching_staff') {
-      if (!['CICT', 'CBME'].includes(updateData.department)) errors.push('Valid department is required')
+    // Validate primary emergency contact if provided
+    if (primaryContactName && !primaryContactName.trim()) {
+      errors.push('Primary contact name must be provided if updating')
+    }
+    if (primaryContactRelationship && !primaryContactRelationship.trim()) {
+      errors.push('Primary contact relationship must be provided if updating')
+    }
+    if (primaryContactPhone && !validatePhone(primaryContactPhone)) {
+      errors.push('Primary contact phone must start with 09 and be exactly 11 digits')
     }
 
-    if (updateData.role === 'non_teaching_staff') {
-      if (!updateData.staffCategory) errors.push('Staff category is required')
+    if (errors.length > 0) {
+      return NextResponse.json({ errors }, { status: 400 })
     }
 
-    // ===== Emergency contact =====
-    if (!updateData.primaryContactName?.trim()) errors.push('Primary contact name is required')
-    if (!updateData.primaryContactRelationship?.trim()) errors.push('Primary contact relationship is required')
-    if (!validatePhone(updateData.primaryContactPhone)) errors.push('Primary contact phone is invalid')
-
-    if (errors.length > 0) return NextResponse.json({ errors }, { status: 400 })
-
-    // ===== UPDATE =====
-    const patient = await prisma.patient.update({
-      where: { id, userId },
+    const updatedPatient = await prisma.patient.update({
+      where: { id },
       data: {
-        ...updateData,
-        dateOfBirth: new Date(updateData.dateOfBirth).toISOString(), // ✅ fixed
-        middleName: updateData.middleName || null,
-        suffix: updateData.suffix || null,
-        email: updateData.email || null,
-        address: updateData.address || null,
-        program: updateData.role === 'student' ? updateData.program : null,
-        course: updateData.role === 'student' ? updateData.course : null,
-        yearLevel: updateData.role === 'student' ? updateData.yearLevel : null,
-        block: updateData.role === 'student' ? updateData.block : null,
-        department: updateData.role === 'teaching_staff' ? updateData.department : null,
-        staffCategory: updateData.role === 'non_teaching_staff' ? updateData.staffCategory : null,
-        pastIllnesses: updateData.pastIllnesses || null,
-        surgeries: updateData.surgeries || null,
-        currentMedication: updateData.currentMedication || null,
-        allergies: updateData.allergies || null,
-        medicalNotes: updateData.medicalNotes || null,
-        primaryContactAddress: updateData.primaryContactAddress || null,
-        secondaryContactName: updateData.secondaryContactName || null,
-        secondaryContactRelationship: updateData.secondaryContactRelationship || null,
-        secondaryContactPhone: updateData.secondaryContactPhone || null,
-        secondaryContactAddress: updateData.secondaryContactAddress || null,
-        attachments: parseAttachments(updateData.attachments),
-      },
+        firstName: firstName || undefined,
+        middleName: middleName || null,
+        lastName: lastName || undefined,
+        suffix: suffix || null,
+        dateOfBirth: dateOfBirth || undefined,
+        gender: gender || undefined,
+        phone: phone || undefined,
+        email: email || null,
+        address: address || null,
+        role: role || undefined,
+        idNumber: idNumber || undefined,
+        program: role === 'student' ? program : null,
+        course: role === 'student' ? course : null,
+        yearLevel: role === 'student' ? yearLevel : null,
+        block: role === 'student' ? block : null,
+        department: role === 'teaching_staff' ? department : null,
+        staffCategory: role === 'non_teaching_staff' ? staffCategory : null,
+        // Medical History
+        pastIllnesses: pastIllnesses || null,
+        surgeries: surgeries || null,
+        currentMedication: currentMedication || null,
+        allergies: allergies || null,
+        medicalNotes: medicalNotes || null,
+        // Emergency Contacts
+        primaryContactName: primaryContactName || undefined,
+        primaryContactRelationship: primaryContactRelationship || undefined,
+        primaryContactPhone: primaryContactPhone || undefined,
+        primaryContactAddress: primaryContactAddress || null,
+        secondaryContactName: secondaryContactName || null,
+        secondaryContactRelationship: secondaryContactRelationship || null,
+        secondaryContactPhone: secondaryContactPhone || null,
+        secondaryContactAddress: secondaryContactAddress || null,
+        attachments: parseAttachments(attachments)
+      }
     })
 
-    return NextResponse.json({ patient })
-  } catch (error: any) {
+    return NextResponse.json({ patient: updatedPatient })
+  } catch (error) {
     console.error('Update patient error:', error)
-    return NextResponse.json({ error: 'Failed to update patient', details: error.message }, { status: 500 })
-  }
-}
-
-// ======= DELETE - Delete patient =======
-export async function DELETE(request: NextRequest) {
-  try {
-    const userId = request.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { id } = await request.json()
-    if (!id) return NextResponse.json({ error: 'Patient ID is required' }, { status: 400 })
-
-    await prisma.patient.delete({ where: { id, userId } })
-    return NextResponse.json({ message: 'Patient deleted successfully' })
-  } catch (error: any) {
-    console.error('Delete patient error:', error)
-    return NextResponse.json({ error: 'Failed to delete patient', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

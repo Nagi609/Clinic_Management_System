@@ -70,10 +70,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-green-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div
+      className="min-h-screen bg-cover bg-center flex items-center justify-center p-4"
+      style={{
+        backgroundImage: "url('/bg.png')",
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="relative w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-2xl p-8 space-y-8">
           <div className="text-center">
+            <img src="/cliniclogo.png" alt="Clinic Logo" className="h-16 w-auto mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-[#8B3A3A] mb-2">Clinic Management</h1>
             <p className="text-gray-500">Welcome back</p>
           </div>
@@ -112,12 +119,6 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-            </div>
-
-            <div className="text-right">
-              <Link href="#" className="text-sm text-[#8B3A3A] hover:underline">
-                Forgot password?
-              </Link>
             </div>
 
             <button

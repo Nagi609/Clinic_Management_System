@@ -26,6 +26,7 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   useEffect(() => {
     const currentUser = getCurrentUser()
@@ -66,7 +67,14 @@ export default function ProfilePage() {
   }
 
   const handleInputChange = (field: keyof ProfileData, value: string) => {
-    setProfile({ ...profile, [field]: value })
+    if (field === "phone") {
+      // allow digits only, max 11 digits
+      const digits = value.replace(/[^0-9]/g, "").slice(0, 11)
+      setProfile({ ...profile, phone: digits })
+      setPhoneError(null)
+    } else {
+      setProfile({ ...profile, [field]: value })
+    }
   }
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,6 +90,13 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!user) return
+    // Validate phone before save (only if provided)
+    if (profile.phone) {
+      if (!profile.phone.startsWith("09")) {
+        setPhoneError("Phone number must start with 09")
+        return
+      }
+    }
     try {
       const response = await fetch("/api/users/profile", {
         method: "PUT",
@@ -167,13 +182,14 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">Phone</label>
-                <input
-                  type="text"
-                  value={profile.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
-                  disabled={!editing}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50"
-                />
+                  <input
+                    type="text"
+                    value={profile.phone}
+                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                    disabled={!editing}
+                    className={`w-full px-4 py-2 border rounded-lg ${phoneError ? 'border-red-500' : 'border-gray-300'} disabled:bg-gray-50`}
+                  />
+                  {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
               </div>
 
               <div>

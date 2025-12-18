@@ -1,13 +1,45 @@
 "use client"
 
 import { User } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 export function Header() {
   const [profileOpen, setProfileOpen] = useState(false)
+  const [profileAvatar, setProfileAvatar] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string>("")
+  const [user, setUser] = useState<any>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    const currentUser = localStorage.getItem("user")
+    if (currentUser) {
+      setUser(JSON.parse(currentUser))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile()
+    }
+  }, [user])
+
+  const fetchProfile = async () => {
+    if (!user) return
+    try {
+      const response = await fetch("/api/users/profile", {
+        headers: { "x-user-id": user.id },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProfileAvatar(data.user.avatar)
+        setUserName(data.user.fullName)
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error)
+    }
+  }
 
   const handleSignOut = () => {
     localStorage.removeItem("user")
@@ -25,9 +57,13 @@ export function Header() {
         <div className="relative">
           <button
             onClick={() => setProfileOpen(!profileOpen)}
-            className="w-10 h-10 bg-[#8B3A3A] rounded-full flex items-center justify-center text-white font-bold hover:bg-[#6D2E2E]"
+            className="w-10 h-10 bg-[#8B3A3A] rounded-full flex items-center justify-center text-white font-bold hover:bg-[#6D2E2E] overflow-hidden"
           >
-            <User size={20} />
+            {profileAvatar ? (
+              <img src={profileAvatar} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <User size={20} />
+            )}
           </button>
           {profileOpen && (
             <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg w-48">

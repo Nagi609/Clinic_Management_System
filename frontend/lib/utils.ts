@@ -6,6 +6,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function formatDateTime(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).replace(/\//g, '-').replace(',', ':')
+}
+
 interface Activity {
   id: number
   type: "visit" | "patient"
@@ -23,7 +35,7 @@ export async function logActivity(type: "visit" | "patient", message: string) {
     // Send activity to database via API
     await fetch("/api/activities", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         "x-user-id": user.id,
       },

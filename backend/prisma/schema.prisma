@@ -11,7 +11,7 @@ datasource db {
 // ─── PATIENT MODEL ─────────────────────────────────────────────────────────────
 //
 model Patient {
-  id                String        @id @default(cuid())
+  id                Int           @id
 
   // Personal Information
   firstName         String
@@ -74,6 +74,7 @@ model Patient {
 //
 model User {
   id            String          @id @default(cuid())
+  numericId     Int             @unique @default(0)
   username      String          @unique
   email         String          @unique
   password      String
@@ -144,8 +145,8 @@ model Activity {
 // ─── VISIT RECORD MODEL ───────────────────────────────────────────────────────
 //
 model VisitRecord {
-  id         String   @id @default(cuid())
-  patientId  String?
+  id         Int      @id
+  patientId  Int?
   visitorName String?
   userId     String
 

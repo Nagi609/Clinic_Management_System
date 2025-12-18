@@ -111,19 +111,25 @@ export default function DashboardPage() {
         
         // Count today's visits
         const todayVisits = allVisits.filter(
-          (v: VisitRecord) => v.visitDate === todayStr
+          (v: VisitRecord) => new Date(v.visitDate).toISOString().split("T")[0] === todayStr
         )
         setVisitsToday(todayVisits.length)
-        
+
         // Count this week's visits
         const weekVisits = allVisits.filter(
-          (v: VisitRecord) => v.visitDate >= weekAgoStr && v.visitDate <= todayStr
+          (v: VisitRecord) => {
+            const visitDate = new Date(v.visitDate).toISOString().split("T")[0]
+            return visitDate >= weekAgoStr && visitDate <= todayStr
+          }
         )
         setVisitsThisWeek(weekVisits.length)
-        
+
         // Count this month's visits
         const monthVisits = allVisits.filter(
-          (v: VisitRecord) => v.visitDate >= monthAgoStr && v.visitDate <= todayStr
+          (v: VisitRecord) => {
+            const visitDate = new Date(v.visitDate).toISOString().split("T")[0]
+            return visitDate >= monthAgoStr && visitDate <= todayStr
+          }
         )
         setVisitsThisMonth(monthVisits.length)
       }

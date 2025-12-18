@@ -5,20 +5,19 @@ import { useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { validateEmail } from "@/lib/auth"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
+  const [usernameOrEmail, setUsernameOrEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     const newErrors: string[] = []
 
-    if (!validateEmail(email)) newErrors.push("Email must contain @ symbol")
+    if (!usernameOrEmail) newErrors.push("Username or Email is required")
     if (!password) newErrors.push("Password is required")
 
     if (newErrors.length > 0) {
@@ -26,22 +25,41 @@ export default function LoginPage() {
       return
     }
 
-    // Mock login with session storage
-    sessionStorage.setItem("user", JSON.stringify({ email, role: "admin" }))
-    router.push("/dashboard")
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrEmail, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setErrors([data.error || 'Login failed'])
+        return
+      }
+
+      // Success
+      sessionStorage.setItem("user", JSON.stringify(data.user))
+      router.push("/dashboard")
+    } catch (error) {
+      console.error('Login error:', error)
+      setErrors(['An unexpected error occurred. Please try again.'])
+    }
   }
 
   return (
     <div
       className="min-h-screen bg-cover bg-center flex items-center justify-center p-4"
       style={{
-        backgroundImage: "url('/images/1764341742670.jpg')",
+        backgroundImage: "url('/bg.png')",
       }}
     >
       <div className="absolute inset-0 bg-black/40" />
       <div className="relative w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-2xl p-8 space-y-8">
           <div className="text-center">
+            <img src="/cliniclogo.png" alt="Clinic Logo" className="h-16 w-auto mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-[#8B3A3A] mb-2">Clinic Management</h1>
             <p className="text-gray-500">Welcome back</p>
           </div>
@@ -58,12 +76,12 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Email</label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Username or Email</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                type="text"
+                value={usernameOrEmail}
+                onChange={(e) => setUsernameOrEmail(e.target.value)}
+                placeholder="Enter your username or email"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A] bg-gray-50"
               />
             </div>
@@ -86,12 +104,6 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-            </div>
-
-            <div className="text-right">
-              <Link href="#" className="text-sm text-[#8B3A3A] hover:underline">
-                Forgot password?
-              </Link>
             </div>
 
             <button

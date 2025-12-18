@@ -5,12 +5,9 @@ import { LayoutWrapper } from "@/components/layout-wrapper"
 import { Search, Plus, Edit2, X, Paperclip } from "lucide-react"
 import { getCurrentUser, checkPermission } from "@/lib/constants"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
+// using native date input for patient date of birth
 
 type PatientRole = "student" | "teaching_staff" | "non_teaching_staff"
 type Program = "CICT" | "CBME"
@@ -19,7 +16,7 @@ type CBMECourse = "BSA" | "BSAIS" | "BPA" | "BSE"
 type NonTeachingCategory = "Administration" | "Accounting" | "Human Resources" | "Student Service" | "Library" | "Maintenance" | "Security" | "Supply" | "Clinic"
 
 interface Patient {
-  id: string
+  id: number
   firstName: string
   middleName?: string
   lastName: string
@@ -50,7 +47,6 @@ interface Patient {
   secondaryContactRelationship?: string
   secondaryContactPhone?: string
   secondaryContactAddress?: string
-  attachments?: string
 }
 
 interface FormData {
@@ -84,7 +80,6 @@ interface FormData {
   secondaryContactRelationship: string
   secondaryContactPhone: string
   secondaryContactAddress: string
-  attachments?: string
 }
 
 const COURSE_OPTIONS: Record<Program, string[]> = {
@@ -123,7 +118,6 @@ const initialFormData: FormData = {
   secondaryContactRelationship: "",
   secondaryContactPhone: "",
   secondaryContactAddress: "",
-  attachments: "",
 }
 
 export default function PatientsPage() {
@@ -163,11 +157,10 @@ export default function PatientsPage() {
     secondaryContactName: "",
     secondaryContactRelationship: "",
     secondaryContactPhone: "",
-    secondaryContactAddress: "",
-    attachments: "",
+    secondaryContactAddress: ""
   })
   const [availableCourses, setAvailableCourses] = useState<string[]>([])
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDateOfBirth, setSelectedDateOfBirth] = useState<Date | undefined>()
@@ -177,7 +170,7 @@ export default function PatientsPage() {
   // Refs for validation scrolling
   const firstNameRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
-  const dateOfBirthRef = useRef<HTMLButtonElement>(null)
+  const dateOfBirthRef = useRef<HTMLInputElement>(null)
   const genderRef = useRef<HTMLSelectElement>(null)
   const phoneRef = useRef<HTMLInputElement>(null)
   const programRef = useRef<HTMLSelectElement>(null)
@@ -272,6 +265,7 @@ export default function PatientsPage() {
     if (!selectedDateOfBirth) errors.dateOfBirth = true
     if (!formData.gender) errors.gender = true
     if (!/^09\d{9}$/.test(formData.phone)) errors.phone = true
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = true
 
     if (formData.role === "student") {
       if (!formData.program) errors.program = true
@@ -306,7 +300,7 @@ export default function PatientsPage() {
         const patientName = `${formData.firstName} ${formData.lastName}`
         const action = editingPatient ? "updated" : "added"
         await createActivity("patient", `Patient ${patientName} was ${action}`)
-        toast({ title: "Success", description: `Patient ${patientName} has been ${action} successfully.` })
+        toast({ title: "Success", description: `Patient ${patientName} has been ${action} successfully.`, variant: "success" })
 
         if (!editingPatient) {
           setShowForm(false)
@@ -366,14 +360,13 @@ export default function PatientsPage() {
       secondaryContactRelationship: patient.secondaryContactRelationship || "",
       secondaryContactPhone: patient.secondaryContactPhone || "",
       secondaryContactAddress: patient.secondaryContactAddress || "",
-      attachments: patient.attachments || "",
     })
     setSelectedDateOfBirth(new Date(patient.dateOfBirth))
     setAvailableCourses(patient.program ? COURSE_OPTIONS[patient.program] : [])
     setShowForm(true)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
       const patient = patients.find(p => p.id === id)
       const response = await fetch("/api/patients", {
@@ -385,7 +378,7 @@ export default function PatientsPage() {
         if (patient) {
           const patientName = `${patient.firstName} ${patient.lastName}`
           await createActivity("patient", `Patient ${patientName} was deleted`)
-          toast({ title: "Success", description: `Patient ${patientName} has been deleted successfully.` })
+          toast({ title: "Success", description: `Patient ${patientName} has been deleted successfully.`, variant: "destructive" })
         }
         fetchPatients()
       } else {
@@ -543,36 +536,20 @@ export default function PatientsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth *</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          ref={dateOfBirthRef}
-                          variant="outline"
-                          className={`w-full justify-start text-left font-normal ${formErrors.dateOfBirth ? 'border-red-500' : ''}`}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDateOfBirth ? format(selectedDateOfBirth, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDateOfBirth}
-                          onSelect={(date) => {
-                            setSelectedDateOfBirth(date)
-                            if (date) {
-                              setFormData((prev) => ({ ...prev, dateOfBirth: date.toISOString().split('T')[0] }))
-                            }
-                            if (formErrors.dateOfBirth) setFormErrors((prev) => ({ ...prev, dateOfBirth: false }))
-                          }}
-                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                          initialFocus
-                          captionLayout="dropdown"
-                          fromYear={1900}
-                          toYear={new Date().getFullYear()}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <input
+                      ref={dateOfBirthRef}
+                      type="date"
+                      name="dateOfBirth"
+                      value={formData.dateOfBirth}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setFormData((prev) => ({ ...prev, dateOfBirth: v }))
+                        setSelectedDateOfBirth(v ? new Date(v) : undefined)
+                        if (formErrors.dateOfBirth) setFormErrors((prev) => ({ ...prev, dateOfBirth: false }))
+                      }}
+                      max={new Date().toISOString().split('T')[0]}
+                      className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.dateOfBirth ? 'border-red-500' : 'border-gray-300'}`}
+                    />
                     {formErrors.dateOfBirth && <p className="text-red-500 text-xs mt-1">Date of birth is required</p>}
                   </div>
                   <div>
@@ -593,13 +570,14 @@ export default function PatientsPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <input
-                      type="email"
+                      type="text"
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
                       placeholder="Enter email address"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`}
                     />
+                    {formErrors.email && <p className="text-red-500 text-xs mt-1">Valid email address is required</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
@@ -925,23 +903,6 @@ export default function PatientsPage() {
                   </div>
                 </div>
 
-                {/* Attachments */}
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Attachments</label>
-                  <input
-                    type="file"
-                    name="attachments"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        // Handle file upload
-                        setFormData((prev) => ({ ...prev, attachments: file.name }))
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
                 <div className="flex justify-end gap-4 mt-6">
                   <Button variant="outline" onClick={() => { setShowForm(false); setEditingPatient(null); }}>
                     Cancel
@@ -962,12 +923,12 @@ export default function PatientsPage() {
             <p className="text-gray-500 text-center">No patients found</p>
           ) : (
             <div className="space-y-4">
-              {filteredPatients.map((patient) => (
+              {filteredPatients.map((patient, index) => (
                 <div key={patient.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-bold">{getFullName(patient)}</h3>
-                      <p className="text-sm text-gray-600">ID: {patient.idNumber} | Role: {patient.role.replace('_', ' ')}</p>
+                      <p className="text-sm text-gray-600">ID: {index + 1} | Role: {patient.role.replace('_', ' ')}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => setExpandedId(expandedId === patient.id ? null : patient.id)}>
@@ -1031,9 +992,6 @@ export default function PatientsPage() {
                       <p><strong>Primary Contact:</strong> {patient.primaryContactName} ({patient.primaryContactRelationship}) - {patient.primaryContactPhone}</p>
                       {patient.secondaryContactName && (
                         <p><strong>Secondary Contact:</strong> {patient.secondaryContactName} ({patient.secondaryContactRelationship}) - {patient.secondaryContactPhone}</p>
-                      )}
-                      {patient.attachments && (
-                        <p><strong>Attachments:</strong> <a href={patient.attachments} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline"><Paperclip className="inline h-4 w-4 mr-1" />View</a></p>
                       )}
                     </div>
                   )}

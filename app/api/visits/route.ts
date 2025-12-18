@@ -1,159 +1,180 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/db"
+import { getNextIdForUser } from "@/lib/id-utils"
 
-// Utility: return JSON with status
-function json(data: any, status = 200) {
-  return NextResponse.json(data, { status })
-}
-
-// ─────────────────────────────────────────────
-// GET - All visit records for current user
-// ─────────────────────────────────────────────
+// GET all visits for the current user
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get("x-user-id")
-    if (!userId) return json({ error: "Unauthorized" }, 401)
+    const userId = request.headers.get('x-user-id')
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const visits = await prisma.visitRecord.findMany({
       where: { userId },
+      orderBy: { createdAt: 'desc' },
       include: {
-        Patient: {
-          select: {
-            id: true,
-            firstName: true,
-            middleName: true,
-            lastName: true,
-            suffix: true,
-          },
-        },
-        User: {
-          select: { fullName: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
+        Patient: true
+      }
     })
 
-    return json({ visits })
+    return NextResponse.json({ visits })
   } catch (error) {
-    console.error("GET visits error:", error)
-    return json({ error: "Internal server error" }, 500)
+    console.error('Get visits error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// ─────────────────────────────────────────────
-// POST - Create a new visit record
-// ─────────────────────────────────────────────
+// POST - Create a new visit
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get("x-user-id")
-    if (!userId) return json({ error: "Unauthorized" }, 401)
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { patientId, visitorName, visitDate, reason, symptoms, treatment, notes } =
-      await request.json()
+    const {
+      patientId,
+      reason,
+      symptoms,
+      treatment,
+      notes
+    } = await request.json()
 
-    if (!visitDate || !reason || !symptoms || !treatment) {
-      return json({ error: "Missing required fields" }, 400)
+    // Validate required fields
+    const errors: string[] = []
+
+    if (!patientId) {
+      errors.push('Patient ID is required')
+    }
+    if (!reason || !reason.trim()) {
+      errors.push('Reason for visit is required')
     }
 
-    // Validate patient ownership if patientId provided
-    if (patientId) {
-      const patient = await prisma.patient.findUnique({ where: { id: patientId } })
-      if (!patient || patient.userId !== userId) {
-        return json({ error: "Patient not found or unauthorized" }, 404)
-      }
+    if (errors.length > 0) {
+      return NextResponse.json({ errors }, { status: 400 })
     }
 
-    // Walk-in visit requires visitorName
-    if (!patientId && !visitorName) {
-      return json({ error: "Either patient selection or visitor name is required" }, 400)
+    // Verify patient exists and belongs to user
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId }
+    })
+    if (!patient || patient.userId !== userId) {
+      return NextResponse.json({ error: 'Patient not found or unauthorized' }, { status: 404 })
     }
+
+    // Get next ID for this user
+    const nextId = await getNextIdForUser('VisitRecord', userId)
 
     const visit = await prisma.visitRecord.create({
       data: {
-        patientId: patientId ?? null,
-        visitorName: patientId ? null : visitorName ?? null,
-        visitDate,
+        id: nextId,
+        patientId,
+        visitDate: new Date().toISOString(),
         reason,
-        symptoms,
-        treatment,
-        notes: notes ?? null,
-        userId,
+        symptoms: symptoms || '',
+        treatment: treatment || '',
+        notes: notes || null,
+        userId
       },
+      include: {
+        Patient: true
+      }
     })
 
-    return json({ visit }, 201)
+    return NextResponse.json({ visit }, { status: 201 })
   } catch (error) {
-    console.error("POST visit error:", error)
-    return json({ error: "Internal server error" }, 500)
+    console.error('Create visit error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// ─────────────────────────────────────────────
-// PUT - Update a visit record
-// ─────────────────────────────────────────────
+// PUT - Update a visit
 export async function PUT(request: NextRequest) {
   try {
-    const userId = request.headers.get("x-user-id")
-    if (!userId) return json({ error: "Unauthorized" }, 401)
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { id, patientId, visitorName, visitDate, reason, symptoms, treatment, notes } =
-      await request.json()
+    const {
+      id,
+      patientId,
+      visitDate,
+      reason,
+      symptoms,
+      treatment,
+      notes
+    } = await request.json()
 
-    if (!id) return json({ error: "Visit ID required" }, 400)
+    if (!id) return NextResponse.json({ error: 'Visit ID required' }, { status: 400 })
 
-    const existing = await prisma.visitRecord.findUnique({ where: { id } })
-    if (!existing || existing.userId !== userId) {
-      return json({ error: "Visit not found or unauthorized" }, 404)
+    const visit = await prisma.visitRecord.findUnique({
+      where: { id },
+      include: { Patient: true }
+    })
+    if (!visit || visit.userId !== userId) {
+      return NextResponse.json({ error: 'Visit not found or unauthorized' }, { status: 404 })
     }
 
-    // Validate patient if changed
-    if (patientId && patientId !== existing.patientId) {
-      const patient = await prisma.patient.findUnique({ where: { id: patientId } })
+    // Validate fields if provided
+    const errors: string[] = []
+
+    if (patientId) {
+      const patient = await prisma.patient.findUnique({
+        where: { id: patientId }
+      })
       if (!patient || patient.userId !== userId) {
-        return json({ error: "Patient not found or unauthorized" }, 404)
+        errors.push('Patient not found or unauthorized')
       }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json({ errors }, { status: 400 })
     }
 
     const updatedVisit = await prisma.visitRecord.update({
       where: { id },
       data: {
-        patientId: patientId ?? null,
-        visitorName: patientId ? null : visitorName ?? null,
-        visitDate,
-        reason,
-        symptoms,
-        treatment,
-        notes: notes ?? null,
+        patientId: patientId || undefined,
+        visitDate: visitDate ? new Date(visitDate).toISOString() : undefined,
+        reason: reason || undefined,
+        symptoms: symptoms || undefined,
+        treatment: treatment || undefined,
+        notes: notes || null
       },
+      include: {
+        Patient: true
+      }
     })
 
-    return json({ visit: updatedVisit })
+    return NextResponse.json({ visit: updatedVisit })
   } catch (error) {
-    console.error("PUT visit error:", error)
-    return json({ error: "Internal server error" }, 500)
+    console.error('Update visit error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// ─────────────────────────────────────────────
-// DELETE - Remove a visit record
-// ─────────────────────────────────────────────
+// DELETE - Delete a visit
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = request.headers.get("x-user-id")
-    if (!userId) return json({ error: "Unauthorized" }, 401)
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = await request.json()
-    if (!id) return json({ error: "Visit ID required" }, 400)
 
-    const visit = await prisma.visitRecord.findUnique({ where: { id } })
+    if (!id) return NextResponse.json({ error: 'Visit ID required' }, { status: 400 })
+
+    const visit = await prisma.visitRecord.findUnique({
+      where: { id }
+    })
     if (!visit || visit.userId !== userId) {
-      return json({ error: "Visit not found or unauthorized" }, 404)
+      return NextResponse.json({ error: 'Visit not found or unauthorized' }, { status: 404 })
     }
 
-    await prisma.visitRecord.delete({ where: { id } })
-    return json({ message: "Visit deleted successfully" })
+    await prisma.visitRecord.delete({
+      where: { id }
+    })
+
+    return NextResponse.json({ message: 'Visit deleted successfully' })
   } catch (error) {
-    console.error("DELETE visit error:", error)
-    return json({ error: "Internal server error" }, 500)
+    console.error('Delete visit error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

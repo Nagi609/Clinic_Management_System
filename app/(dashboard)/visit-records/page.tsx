@@ -5,16 +5,18 @@ import { useState, useEffect, useRef } from "react"
 import { LayoutWrapper } from "@/components/layout-wrapper"
 import { Plus, Search, Calendar, User, FileText, X, Edit2, Trash2 } from "lucide-react"
 import { getCurrentUser, checkPermission } from "@/lib/constants"
-import { logActivity } from "@/lib/utils"
+import { logActivity, formatDateTime } from "@/lib/utils"
+import { toast } from "@/hooks/use-toast"
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog"
 
 interface Patient {
-  id: string
+  id: number
   name: string
 }
 
 interface VisitRecord {
-  id: string
-  patientId?: string
+  id: number
+  patientId?: number
   patientName: string
   visitDate: string
   reason: string
@@ -30,10 +32,9 @@ export default function VisitRecordsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("date")
   const [showAddForm, setShowAddForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [newVisit, setNewVisit] = useState<Partial<VisitRecord>>({
     patientName: "",
-    visitDate: new Date().toISOString().split("T")[0],
     reason: "",
     symptoms: "",
     treatment: "",
@@ -63,7 +64,7 @@ export default function VisitRecordsPage() {
     try {
       setIsLoading(true)
       const response = await fetch("/api/visits", {
-        headers: { "x-user-id": user.id },
+        headers: { "x-user-id": String(user.id) },
       })
       if (response.ok) {
         const data = await response.json()
@@ -99,8 +100,8 @@ export default function VisitRecordsPage() {
     }
     const delayDebounce = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/patients?search=${encodeURIComponent(newVisit.patientName)}`, {
-          headers: { "x-user-id": user.id },
+        const res = await fetch(`/api/patients?search=${encodeURIComponent(newVisit.patientName || '')}`, {
+          headers: { "x-user-id": String(user.id) },
         })
         if (res.ok) {
           const data = await res.json()
@@ -130,8 +131,7 @@ export default function VisitRecordsPage() {
     setIsSubmitting(true)
     const errors: string[] = []
 
-    if (!newVisit.patientId?.trim()) errors.push("Patient selection is required")
-    if (!newVisit.visitDate) errors.push("Visit date is required")
+    if (!newVisit.patientId) errors.push("Patient selection is required")
     if (!newVisit.reason?.trim()) errors.push("Reason for visit is required")
     if (!newVisit.symptoms?.trim()) errors.push("Symptoms description is required")
     if (!newVisit.treatment?.trim()) errors.push("Treatment information is required")
@@ -147,15 +147,14 @@ export default function VisitRecordsPage() {
         // Update
         const res = await fetch("/api/visits", {
           method: "PUT",
-          headers: { "Content-Type": "application/json", "x-user-id": user.id },
+          headers: { "Content-Type": "application/json", "x-user-id": String(user.id) },
           body: JSON.stringify({
             id: editingId,
             patientId: newVisit.patientId,
-            visitDate: newVisit.visitDate,
-            reason: newVisit.reason,
-            symptoms: newVisit.symptoms,
-            treatment: newVisit.treatment,
-            notes: newVisit.notes,
+            reason: newVisit.reason || "",
+            symptoms: newVisit.symptoms || "",
+            treatment: newVisit.treatment || "",
+            notes: newVisit.notes || "",
           }),
         })
         if (!res.ok) {
@@ -163,18 +162,26 @@ export default function VisitRecordsPage() {
           setFormErrors([err.error || "Failed to update visit"])
           return
         }
+        // show success toast for update
+        toast({ title: "Success", description: "Visit updated.", variant: "success" })
+        // Log activity for update
+        const updatedData = await res.json()
+        const updatedVisit = updatedData.visit
+        const updatedPatientName = updatedVisit.Patient
+          ? `${updatedVisit.Patient.firstName} ${updatedVisit.Patient.lastName}`
+          : 'Unknown Patient'
+        await logActivity("visit", `Visit record updated for ${updatedPatientName}`)
       } else {
         // Create
         const res = await fetch("/api/visits", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-user-id": user.id },
+          headers: { "Content-Type": "application/json", "x-user-id": String(user.id) },
           body: JSON.stringify({
             patientId: newVisit.patientId,
-            visitDate: newVisit.visitDate,
-            reason: newVisit.reason,
-            symptoms: newVisit.symptoms,
-            treatment: newVisit.treatment,
-            notes: newVisit.notes,
+            reason: newVisit.reason || "",
+            symptoms: newVisit.symptoms || "",
+            treatment: newVisit.treatment || "",
+            notes: newVisit.notes || "",
           }),
         })
         if (!res.ok) {
@@ -182,6 +189,15 @@ export default function VisitRecordsPage() {
           setFormErrors([err.error || "Failed to save visit"])
           return
         }
+        // show success toast for create
+        const createData = await res.json()
+        const createVisit = createData.visit
+        const createPatientName = createVisit.Patient
+          ? `${createVisit.Patient.firstName} ${createVisit.Patient.lastName}`
+          : 'Unknown Patient'
+        toast({ title: "Success", description: `Added new visit for ${createPatientName}`, variant: "success" })
+        // Log activity for create
+        await logActivity("visit", `Visit record added for ${createPatientName}`)
       }
 
       await fetchVisits()
@@ -189,7 +205,6 @@ export default function VisitRecordsPage() {
       setEditingId(null)
       setNewVisit({
         patientName: "",
-        visitDate: new Date().toISOString().split("T")[0],
         reason: "",
         symptoms: "",
         treatment: "",
@@ -212,15 +227,17 @@ export default function VisitRecordsPage() {
     setShowAddForm(true)
   }
 
-  const handleDeleteVisit = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this visit record?")) return
+  const handleDeleteVisit = async (id: number) => {
     try {
       const res = await fetch("/api/visits", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        headers: { "Content-Type": "application/json", "x-user-id": String(user.id) },
         body: JSON.stringify({ id }),
       })
-      if (res.ok) await fetchVisits()
+      if (res.ok) {
+        await fetchVisits()
+        toast({ title: "Deleted", description: "Visit record deleted.", variant: "destructive" })
+      }
     } catch (err) {
       console.error("Error deleting visit:", err)
     }
@@ -256,7 +273,6 @@ export default function VisitRecordsPage() {
                 setEditingId(null)
                 setNewVisit({
                   patientName: "",
-                  visitDate: new Date().toISOString().split("T")[0],
                   reason: "",
                   symptoms: "",
                   treatment: "",
@@ -300,16 +316,19 @@ export default function VisitRecordsPage() {
             )}
 
             <form onSubmit={handleAddVisit} className="space-y-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Patient Name *
                 </label>
                 <input
                   type="text"
                   value={newVisit.patientName || ""}
-                  onChange={(e) =>
-                    setNewVisit({ ...newVisit, patientName: e.target.value, patientId: "" })
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value
+                    // allow only letters and spaces
+                    if (!/^[A-Za-z\s]*$/.test(v)) return
+                    setNewVisit({ ...newVisit, patientName: v, patientId: undefined })
+                  }}
                   placeholder="Enter patient name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
                 />
@@ -332,18 +351,7 @@ export default function VisitRecordsPage() {
                 )}
               </div>
 
-              {/* Visit Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Visit Date *
-                </label>
-                <input
-                  type="date"
-                  value={newVisit.visitDate || ""}
-                  onChange={(e) => setNewVisit({ ...newVisit, visitDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B3A3A]"
-                />
-              </div>
+
 
               {/* Reason */}
               <div>
@@ -460,16 +468,34 @@ export default function VisitRecordsPage() {
                 <div className="bg-[#8B3A3A] text-white p-6 flex justify-between items-start">
                   <div>
                     <h3 className="text-xl font-bold">{visit.patientName}</h3>
-                    <p className="text-sm">{visit.visitDate}</p>
+                    <p className="text-sm">{formatDateTime(visit.visitDate)}</p>
                   </div>
                   {canManageVisits && (
                     <div className="flex gap-2">
                       <button onClick={() => handleEditVisit(visit)}>
                         <Edit2 size={18} className="hover:text-gray-200" />
                       </button>
-                      <button onClick={() => handleDeleteVisit(visit.id)}>
-                        <Trash2 size={18} className="hover:text-gray-200" />
-                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button>
+                            <Trash2 size={18} className="hover:text-gray-200" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Visit Record</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this visit record? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteVisit(visit.id)} className="bg-red-500 hover:bg-red-600">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   )}
                 </div>
