@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clinic Management System — API Documentation</title>
+  <style>
+    body{font-family:Segoe UI,Arial,Helvetica,sans-serif;margin:24px;color:#111}
+    h1,h2{color:#0b5;}
+    pre{background:#f6f8fa;padding:12px;border-radius:6px;overflow:auto}
+    .endpoint{border:1px solid #e6e6e6;padding:14px;border-radius:8px;margin-bottom:12px}
+    .meta{font-size:13px;color:#555;margin-bottom:8px}
+    table{width:100%;border-collapse:collapse;margin:8px 0}
+    td,th{border:1px solid #eee;padding:8px;text-align:left;font-size:13px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:6px;background:#eef; color:#034}
+  </style>
+</head>
+<body>
+  <h1>Clinic Management System — API Documentation</h1>
+  <p>Open this file in a browser to view the API reference for the running app. Base URL for endpoints: <strong>/api/</strong> (Next.js app routes under <code>app/api/</code>).</p>
+
+  <h2>Authentication & Authorization</h2>
+  <div class="endpoint">
+    <p class="meta"><strong>Mechanism:</strong> Requests (except auth endpoints) require the header <code>x-user-id</code> containing a valid user id string. There is no JWT or cookie-based session implemented in the routes — login/signup return user objects and the client is expected to store the user id and include <code>x-user-id</code> on subsequent requests.</p>
+    <p><strong>Notes:</strong> This is a simple header-based auth used in code. For production, use secure token-based authentication (JWT or server sessions) and TLS.</p>
+  </div>
+
+  <h2>Dependencies & Middleware</h2>
+  <div class="endpoint">
+    <ul>
+      <li><strong>Next.js:</strong> route handlers use <code>NextRequest</code> / <code>NextResponse</code> from <code>next/server</code>.</li>
+      <li><strong>Prisma:</strong> <code>@prisma/client</code> used as ORM (<code>prisma</code> import).</li>
+      <li><strong>Bcrypt / bcryptjs:</strong> Used for password hashing and verification in <code>/api/auth</code>.</li>
+      <li><strong>Other libs:</strong> various frontend libs in <code>package.json</code>. See the <code>dependencies</code> section in the project <code>package.json</code> for the full list.</li>
+      <li><strong>Middleware:</strong> The app code does not register global auth middleware; each route performs header checks (reads <code>x-user-id</code>).</li>
+    </ul>
+  </div>
+
+  <h2>Endpoints</h2>
+
+  <!-- Activities -->
+  <div class="endpoint">
+    <h3>Get Latest Activities</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/activities</code> — <span class="badge">GET</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>: user id (required)</div>
+    <p>Returns the latest 10 activity records for the current user.</p>
+    <strong>Sample Request (curl):</strong>
+    <pre>curl -H "x-user-id: USER_ID" http://localhost:3000/api/activities</pre>
+    <strong>Sample Response (200):</strong>
+    <pre>{
+  "activities": [ {"id":"...","type":"note","message":"...","userId":"...","createdAt":"..."}, ... ]
+}</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>401 Unauthorized — {"error":"Unauthorized"} if missing <code>x-user-id</code></li>
+      <li>500 Internal Server Error — {"error":"Internal server error"}</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Create Activity</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/activities</code> — <span class="badge">POST</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code> (required); <code>Content-Type: application/json</code></div>
+    <p>Creates an activity for the current user.</p>
+    <strong>Sample Request Body:</strong>
+    <pre>{ "type": "note", "message": "Patient checked in" }</pre>
+    <strong>Sample Response (200):</strong>
+    <pre>{ "activity": { "id": "...","type":"note","message":"Patient checked in","userId":"..." } }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 Bad Request — missing fields: {"error":"Type and message are required"}</li>
+      <li>401 Unauthorized — missing <code>x-user-id</code></li>
+      <li>500 Internal Server Error</li>
+    </ul>
+  </div>
+
+  <!-- Visits -->
+  <div class="endpoint">
+    <h3>List Visits</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/visits</code> — <span class="badge">GET</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code> (required)</div>
+    <p>Returns all visit records for the user, ordered newest first. Includes patient data.</p>
+    <strong>Sample Response (200):</strong>
+    <pre>{ "visits": [ {"id":"1","patientId":"...","reason":"...","Patient":{...} }, ... ] }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>401 Unauthorized — {"error":"Unauthorized"}</li>
+      <li>500 Internal Server Error</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Create Visit</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/visits</code> — <span class="badge">POST</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>, <code>Content-Type: application/json</code></div>
+    <p>Creates a visit record for a patient belonging to the user. Validates required fields and ownership.</p>
+    <strong>Sample Request Body:</strong>
+    <pre>{ "patientId": "PATIENT_ID", "reason": "Checkup", "symptoms": "...", "treatment": "...", "notes": "..." }</pre>
+    <strong>Sample Response (201):</strong>
+    <pre>{ "visit": { "id": "...","patientId":"PATIENT_ID","reason":"Checkup","Patient":{...} } }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 Bad Request — validation errors array, e.g. {"errors":["Patient ID is required"]}</li>
+      <li>401 Unauthorized — missing <code>x-user-id</code></li>
+      <li>404 Not Found — patient not found or unauthorized: {"error":"Patient not found or unauthorized"}</li>
+      <li>500 Internal Server Error</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Update Visit</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/visits</code> — <span class="badge">PUT</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>, <code>Content-Type: application/json</code></div>
+    <p>Update fields on an existing visit. Requires <code>id</code> in body and ownership.</p>
+    <strong>Sample Request Body:</strong>
+    <pre>{ "id": "VISIT_ID", "reason": "Follow-up", "treatment": "..." }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 Bad Request — {"error":"Visit ID required"} or validation errors</li>
+      <li>401 Unauthorized — missing <code>x-user-id</code></li>
+      <li>404 Not Found — visit not found or unauthorized</li>
+      <li>500 Internal Server Error</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Delete Visit</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/visits</code> — <span class="badge">DELETE</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>, <code>Content-Type: application/json</code></div>
+    <p>Deletes a visit. Provide body {"id":"VISIT_ID"}.</p>
+    <strong>Sample Request Body:</strong>
+    <pre>{ "id": "VISIT_ID" }</pre>
+    <strong>Sample Response (200):</strong>
+    <pre>{ "message": "Visit deleted successfully" }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — {"error":"Visit ID required"}</li>
+      <li>401 — Unauthorized</li>
+      <li>404 — {"error":"Visit not found or unauthorized"}</li>
+      <li>500 — Internal server error</li>
+    </ul>
+  </div>
+
+  <!-- Patients -->
+  <div class="endpoint">
+    <h3>List Patients</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/patients</code> — <span class="badge">GET</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code> (required)</div>
+    <p>Returns patients owned by the user. Supports optional query param <code>?search=term</code>.</p>
+    <strong>Sample Response (200):</strong>
+    <pre>{ "patients": [ {"id":"...","firstName":"...","lastName":"..."}, ... ] }</pre>
+  </div>
+
+  <div class="endpoint">
+    <h3>Create Patient</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/patients</code> — <span class="badge">POST</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>, <code>Content-Type: application/json</code></div>
+    <p>Creates a patient record. Many fields validated (firstName, lastName, phone starting with 09, role etc.). See route for role-specific required fields.</p>
+    <strong>Sample Request Body (minimal):</strong>
+    <pre>{ "firstName":"Jane","lastName":"Doe","dateOfBirth":"2000-01-01","gender":"female","phone":"09123456789","role":"student","idNumber":"12345","primaryContactName":"John Doe","primaryContactRelationship":"Father","primaryContactPhone":"09123456780" }</pre>
+    <strong>Sample Response (201):</strong>
+    <pre>{ "patient": { "id":"...","firstName":"Jane","lastName":"Doe" } }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — validation errors array: {"errors":[...]}</li>
+      <li>401 — Unauthorized</li>
+      <li>409 — Conflict when patient with same idNumber exists</li>
+      <li>500 — Internal server error</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Update Patient</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/patients</code> — <span class="badge">PUT</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>, <code>Content-Type: application/json</code></div>
+    <p>Update an existing patient. Must include <code>id</code>. Partial updates allowed; validations apply to provided fields.</p>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — {"error":"Patient ID required"} or validation errors</li>
+      <li>401 — Unauthorized</li>
+      <li>404 — Not found / unauthorized</li>
+      <li>500 — Internal server error</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Delete Patient</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/patients</code> — <span class="badge">DELETE</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code>, <code>Content-Type: application/json</code></div>
+    <p>Delete a patient by id: body {"id":"PATIENT_ID"}.</p>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — missing id</li>
+      <li>401 — unauthorized</li>
+      <li>404 — not found or unauthorized</li>
+    </ul>
+  </div>
+
+  <!-- Contacts -->
+  <div class="endpoint">
+    <h3>List Contacts</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/contacts</code> — <span class="badge">GET</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code></div>
+    <p>Returns user contacts.</p>
+  </div>
+
+  <div class="endpoint">
+    <h3>Create Contact</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/contacts</code> — <span class="badge">POST</span></div>
+    <div class="meta"><strong>Required body:</strong> <code>{ name, phone, email, relationship? }</code></div>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — missing required fields</li>
+      <li>401,500</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Update Contact</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/contacts</code> — <span class="badge">PUT</span></div>
+    <p>Provide <code>id</code> and updated fields.</p>
+  </div>
+
+  <div class="endpoint">
+    <h3>Delete Contact</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/contacts</code> — <span class="badge">DELETE</span></div>
+    <p>Body: <code>{"id":"CONTACT_ID"}</code></p>
+  </div>
+
+  <!-- Clinic Contacts -->
+  <div class="endpoint">
+    <h3>Clinic Contacts (list/create/update/delete)</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/clinic-contacts</code> — <span class="badge">GET/POST/PUT/DELETE</span></div>
+    <p>Similar behavior to regular contacts; required fields for create: <code>name, icon, link</code>.</p>
+  </div>
+
+  <!-- User Profile -->
+  <div class="endpoint">
+    <h3>Get Profile</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/users/profile</code> — <span class="badge">GET</span></div>
+    <div class="meta"><strong>Headers:</strong> <code>x-user-id</code></div>
+    <p>Returns the user record (password removed) for the given <code>x-user-id</code>.</p>
+  </div>
+
+  <div class="endpoint">
+    <h3>Update Profile</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/users/profile</code> — <span class="badge">PUT</span></div>
+    <p>Body accepts <code>fullName,email,phone,address,avatar</code>. Requires <code>x-user-id</code>.</p>
+  </div>
+
+  <!-- Auth -->
+  <div class="endpoint">
+    <h3>Login</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/auth/login</code> — <span class="badge">POST</span></div>
+    <p>Authenticate with <code>usernameOrEmail</code> and <code>password</code>. On success returns the user object (without password). The code uses <code>bcryptjs.compare()</code> to verify passwords.</p>
+    <strong>Sample Request Body:</strong>
+    <pre>{ "usernameOrEmail": "alice", "password": "secret" }</pre>
+    <strong>Success Response (200):</strong>
+    <pre>{ "user": { "id":"...","username":"alice","email":"..." } }</pre>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — invalid JSON or missing fields</li>
+      <li>401 — invalid credentials</li>
+      <li>500 — database or bcrypt errors</li>
+    </ul>
+  </div>
+
+  <div class="endpoint">
+    <h3>Check Username Availability</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/auth/check-username</code> — <span class="badge">POST</span></div>
+    <p>Body: <code>{"username":"desired"}</code>. Responds with <code>{"available":true|false}</code>.</p>
+  </div>
+
+  <div class="endpoint">
+    <h3>Signup</h3>
+    <div class="meta"><strong>URL / Method:</strong> <code>/api/auth/signup</code> — <span class="badge">POST</span></div>
+    <p>Creates a user account. Required fields: <code>username,email,password,fullName</code>. Passwords are hashed with <code>bcryptjs.hash()</code>. On success returns created user (without password).</p>
+    <strong>Error Responses:</strong>
+    <ul>
+      <li>400 — missing fields or username/email taken</li>
+      <li>500 — internal error</li>
+    </ul>
+  </div>
+
+  <hr />
+  <h2>Notes & Recommendations</h2>
+  <ul>
+    <li>Current auth uses a simple <code>x-user-id</code> header — replace with secure tokens for production.</li>
+    <li>All endpoints return JSON and use status codes shown in examples; clients should handle 4xx/5xx responses accordingly.</li>
+    <li>See server code in <code>app/api/</code> for full validation rules and response shapes.</li>
+  </ul>
+
+  <p>Generated from project files under <code>app/api/</code> on Dec 19, 2025.</p>
+</body>
+</html>
