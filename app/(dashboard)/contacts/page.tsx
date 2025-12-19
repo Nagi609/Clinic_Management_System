@@ -125,7 +125,7 @@ export default function ContactsPage() {
     }
   }
 
-  const isAdmin = user?.role === "admin"
+  const isAdmin = typeof user?.role === 'string' && user.role.toLowerCase() === 'admin'
 
   const handleAddContact = async () => {
     if (!newContact.name?.trim() || !newContact.phone?.trim() || !newContact.email?.trim() || isSubmitting) return
