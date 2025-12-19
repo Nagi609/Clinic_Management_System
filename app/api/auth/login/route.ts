@@ -1,88 +1,70 @@
-import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/db'
-import bcrypt from 'bcryptjs'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
   try {
-    let body: unknown
-
+    // Parse request body safely
+    let body: { usernameOrEmail?: string; password?: string };
     try {
-      body = await request.json()
+      body = await request.json();
     } catch (parseError) {
-      console.error('JSON parse error:', parseError)
-      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      console.error('JSON parse error:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
 
-    const { usernameOrEmail, password } = body as { usernameOrEmail?: unknown; password?: unknown }
+    const { usernameOrEmail, password } = body;
 
-    // Validation
+    // Validate input
     if (!usernameOrEmail || !password) {
-      return new Response(JSON.stringify({ error: 'Username/email and password are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return NextResponse.json(
+        { error: 'Username/email and password are required' },
+        { status: 400 }
+      );
     }
 
     // Find user by username or email
-    let user
+    let user;
     try {
       user = await prisma.user.findFirst({
         where: {
           OR: [
-            { username: String(usernameOrEmail) },
-            { email: String(usernameOrEmail) }
-          ]
-        }
-      })
+            { username: usernameOrEmail },
+            { email: usernameOrEmail },
+          ],
+        },
+      });
     } catch (dbError) {
-      console.error('Database error:', dbError)
-      return new Response(JSON.stringify({ error: 'Database connection error' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      console.error('Database error:', dbError);
+      return NextResponse.json({ error: 'Database connection error' }, { status: 500 });
     }
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Invalid username/email or password' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return NextResponse.json({ error: 'Invalid username/email or password' }, { status: 401 });
     }
 
-    // Check password
-    let passwordMatch = false
+    // Verify password
+    let passwordMatch;
     try {
-      passwordMatch = await bcrypt.compare(String(password), user.password)
+      passwordMatch = await bcrypt.compare(password, user.password);
     } catch (bcryptError) {
-      console.error('Bcrypt error:', bcryptError)
-      return new Response(JSON.stringify({ error: 'Password verification failed' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      console.error('Bcrypt error:', bcryptError);
+      return NextResponse.json({ error: 'Password verification error' }, { status: 500 });
     }
 
     if (!passwordMatch) {
-      return new Response(JSON.stringify({ error: 'Invalid username/email or password' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return NextResponse.json({ error: 'Invalid username/email or password' }, { status: 401 });
     }
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user
-    return new Response(JSON.stringify({ user: userWithoutPassword }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    })
-  } catch (error) {
-    console.error('Login error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return new Response(JSON.stringify({ error: `Internal server error: ${errorMessage}` }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    // Remove password before sending response
+    const { password: _, ...userWithoutPassword } = user;
+
+    return NextResponse.json({ user: userWithoutPassword }, { status: 200 });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    return NextResponse.json(
+      { error: `Internal server error: ${error.message || 'Unknown error'}` },
+      { status: 500 }
+    );
   }
 }

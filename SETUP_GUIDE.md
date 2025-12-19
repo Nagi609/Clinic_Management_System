@@ -21,58 +21,25 @@ If it works without errors, your local setup is complete!
 
 ---
 
-## Step 2: Set Up Turso (Cloud SQLite Database)
+## Step 2: Set Up Production Database (Optional)
 
-### 2.1 Install Turso CLI
-Open your terminal and run:
-```bash
-npm install -g @libsql/client
-```
+For local development, the file-based SQLite database is sufficient. For production deployment (e.g., Vercel), you'll need a cloud database since Vercel's filesystem is read-only.
 
-Or if you prefer using the official Turso CLI:
-- **Windows**: Download from https://github.com/tursodatabase/turso-cli/releases
-- **Mac/Linux**: `curl -sSfL https://get.tur.so/install.sh | bash`
+### Option 1: PostgreSQL (Recommended for Production)
+1. Set up a PostgreSQL database (Vercel Postgres, Supabase, PlanetScale, etc.)
+2. Get your database connection URL
+3. Update your Prisma schema to use PostgreSQL:
+   ```prisma
+   datasource db {
+     provider = "postgresql"
+     url      = env("DATABASE_URL")
+   }
+   ```
+4. Create new migrations: `npx prisma migrate reset --force`
+5. Run migrations on production: `npx prisma migrate deploy`
 
-### 2.2 Sign Up for Turso
-1. Go to https://turso.tech
-2. Click "Sign Up" or "Get Started"
-3. Sign up with your GitHub account (easiest) or email
-
-### 2.3 Login to Turso CLI
-After installing, run:
-```bash
-turso auth login
-```
-This will open your browser to authenticate.
-
-### 2.4 Create Your Database
-Run this command (replace `clinic-management` with your preferred database name):
-```bash
-turso db create clinic-management
-```
-
-You should see output like:
-```
-✓ Created database clinic-management in region [region-name]
-```
-
-### 2.5 Get Your Database URL
-Run:
-```bash
-turso db show clinic-management --url
-```
-
-Copy the URL that looks like: `libsql://clinic-management-[username].turso.io`
-
-### 2.6 Create an Auth Token
-Run:
-```bash
-turso db tokens create clinic-management
-```
-
-Copy the token that's displayed (it's a long string).
-
-**Important**: Save both the URL and token - you'll need them for Vercel!
+### Option 2: Keep SQLite for Production (Not Recommended)
+If you must use SQLite in production, you'll need a persistent file storage solution or use a different hosting platform that supports file-based databases.
 
 ---
 
@@ -85,13 +52,7 @@ npx prisma generate
 ```
 
 ### 3.2 (Optional) Test Connection Locally
-You can test the connection by temporarily setting your local `.env`:
-```
-DATABASE_URL="libsql://your-database-url.turso.io"
-TURSO_AUTH_TOKEN="your-auth-token"
-```
-
-Then run:
+You can test the connection by temporarily setting your local `.env` to your production database URL, then run:
 ```bash
 npx prisma migrate deploy
 ```
@@ -115,22 +76,13 @@ npx prisma migrate deploy
 ### 4.3 Add DATABASE_URL
 1. Click **Add New**
 2. **Key**: `DATABASE_URL`
-3. **Value**: Paste your Turso database URL (from Step 2.5)
-   - Format: `libsql://clinic-management-[username].turso.io`
+3. **Value**: Your production database connection URL (from your cloud provider)
 4. **Environment**: Select **Production**, **Preview**, and **Development** (or at least Production)
 5. Click **Save**
 
-### 4.4 Add TURSO_AUTH_TOKEN
-1. Click **Add New** again
-2. **Key**: `TURSO_AUTH_TOKEN`
-3. **Value**: Paste your Turso auth token (from Step 2.6)
-4. **Environment**: Select **Production**, **Preview**, and **Development**
-5. Click **Save**
-
-### 4.5 Verify Environment Variables
-You should now see both:
+### 4.4 Verify Environment Variables
+You should now see:
 - `DATABASE_URL`
-- `TURSO_AUTH_TOKEN`
 
 ---
 
@@ -176,7 +128,7 @@ npx prisma migrate deploy
 Make sure all your changes are committed:
 ```bash
 git add .
-git commit -m "Configure database for production with Turso"
+git commit -m "Configure database for production"
 git push
 ```
 
@@ -216,20 +168,19 @@ If you have API routes that query the database, test them to ensure they work.
 **Solution**: Make sure `DATABASE_URL` is set in Vercel environment variables.
 
 ### Issue: "Authentication failed"
-**Solution**: Verify `TURSO_AUTH_TOKEN` is correct in Vercel environment variables.
+**Solution**: Verify your database credentials are correct in Vercel environment variables.
 
 ### Issue: "Migration failed"
-**Solution**: 
+**Solution**:
 1. Make sure migrations are run: `npx prisma migrate deploy`
-2. Check that your Turso database is accessible
+2. Check that your production database is accessible
 3. Verify your database URL format is correct
 
 ### Issue: "Table doesn't exist"
-**Solution**: Run migrations on your Turso database:
+**Solution**: Run migrations on your production database:
 ```bash
 # Set environment variables
-export DATABASE_URL="libsql://your-url"
-export TURSO_AUTH_TOKEN="your-token"
+export DATABASE_URL="your-production-database-url"
 
 # Run migrations
 npx prisma migrate deploy
@@ -239,14 +190,8 @@ npx prisma migrate deploy
 
 ## Quick Reference
 
-### Your Turso Database Info
-- **Database Name**: `clinic-management` (or whatever you named it)
-- **Database URL**: `libsql://clinic-management-[username].turso.io`
-- **Auth Token**: (saved from Step 2.6)
-
 ### Vercel Environment Variables Needed
-- `DATABASE_URL` = Your Turso database URL
-- `TURSO_AUTH_TOKEN` = Your Turso auth token
+- `DATABASE_URL` = Your production database connection URL
 
 ### Local Development
 Keep your `.env` file with:
@@ -258,7 +203,6 @@ DATABASE_URL="file:./backend/prisma/prisma/dev.db"
 
 ## Need Help?
 
-- **Turso Documentation**: https://docs.turso.tech
-- **Turso Discord**: https://discord.gg/turso
 - **Prisma Documentation**: https://www.prisma.io/docs
+- **PostgreSQL Documentation**: https://www.postgresql.org/docs/
 

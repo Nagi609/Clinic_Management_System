@@ -16,7 +16,8 @@ type CBMECourse = "BSA" | "BSAIS" | "BPA" | "BSE"
 type NonTeachingCategory = "Administration" | "Accounting" | "Human Resources" | "Student Service" | "Library" | "Maintenance" | "Security" | "Supply" | "Clinic"
 
 interface Patient {
-  id: number
+  id: string
+  numericId?: number
   firstName: string
   middleName?: string
   lastName: string
@@ -160,9 +161,10 @@ export default function PatientsPage() {
     secondaryContactAddress: ""
   })
   const [availableCourses, setAvailableCourses] = useState<string[]>([])
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedDateOfBirth, setSelectedDateOfBirth] = useState<Date | undefined>()
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
@@ -250,6 +252,11 @@ export default function PatientsPage() {
       if (!/^\d{0,11}$/.test(value)) return
     }
 
+    // ID number: allow digits only
+    if (name === 'idNumber') {
+      if (!/^\d*$/.test(value)) return
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }))
 
     // Clear error
@@ -266,6 +273,8 @@ export default function PatientsPage() {
     if (!formData.gender) errors.gender = true
     if (!/^09\d{9}$/.test(formData.phone)) errors.phone = true
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = true
+    // ID number required and digits only
+    if (!formData.idNumber.trim() || !/^\d+$/.test(formData.idNumber)) errors.idNumber = true
 
     if (formData.role === "student") {
       if (!formData.program) errors.program = true
@@ -289,6 +298,8 @@ export default function PatientsPage() {
     if (!validateForm()) return
 
     try {
+      if (isSubmitting) return
+      setIsSubmitting(true)
       const method = editingPatient ? "PUT" : "POST"
       const body = editingPatient ? { ...formData, id: editingPatient.id } : formData
       const response = await fetch("/api/patients", {
@@ -296,7 +307,7 @@ export default function PatientsPage() {
         headers: { "Content-Type": "application/json", "x-user-id": user.id },
         body: JSON.stringify(body),
       })
-      if (response.ok) {
+        if (response.ok) {
         const patientName = `${formData.firstName} ${formData.lastName}`
         const action = editingPatient ? "updated" : "added"
         await createActivity("patient", `Patient ${patientName} was ${action}`)
@@ -309,8 +320,12 @@ export default function PatientsPage() {
           setAvailableCourses([])
           setFormErrors({})
         } else {
-          setShowForm(false)
-          setEditingPatient(null)
+            setShowForm(false)
+            setEditingPatient(null)
+            setFormData(initialFormData)
+            setSelectedDateOfBirth(undefined)
+            setAvailableCourses([])
+            setFormErrors({})
         }
         fetchPatients()
       } else {
@@ -322,9 +337,11 @@ export default function PatientsPage() {
           variant: "destructive",
         })
       }
-    } catch (error) {
-      console.error(error)
-    }
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setIsSubmitting(false)
+      }
   }
 
   const handleEditClick = (patient: Patient) => {
@@ -366,7 +383,7 @@ export default function PatientsPage() {
     setShowForm(true)
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
       const patient = patients.find(p => p.id === id)
       const response = await fetch("/api/patients", {
@@ -382,7 +399,12 @@ export default function PatientsPage() {
         }
         fetchPatients()
       } else {
-        const errorData = await response.json()
+        let errorData: any = { error: 'Unknown error' }
+        try {
+          errorData = await response.json()
+        } catch (e) {
+          // ignore parse errors
+        }
         toast({ title: "Error", description: `Failed to delete patient: ${errorData.error || 'Unknown error'}`, variant: "destructive" })
       }
     } catch (error) {
@@ -412,7 +434,17 @@ export default function PatientsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Patient Management</h1>
           {canManagePatients && (
-            <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                setEditingPatient(null)
+                setFormData(initialFormData)
+                setSelectedDateOfBirth(undefined)
+                setAvailableCourses([])
+                setFormErrors({})
+                setShowForm(true)
+              }}
+              className="flex items-center gap-2"
+            >
               <Plus className="h-4 w-4" />
               Add Patient
             </Button>
@@ -458,7 +490,18 @@ export default function PatientsPage() {
           <div className="bg-white p-6 rounded-lg shadow-md border">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">{editingPatient ? "Edit Patient" : "Add New Patient"}</h2>
-              <Button variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditingPatient(null); }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowForm(false)
+                  setEditingPatient(null)
+                  setFormData(initialFormData)
+                  setSelectedDateOfBirth(undefined)
+                  setAvailableCourses([])
+                  setFormErrors({})
+                }}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -619,6 +662,7 @@ export default function PatientsPage() {
                         placeholder="Enter ID number"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
+                      {formErrors.idNumber && <p className="text-red-500 text-xs mt-1">ID number is required and must contain numbers only</p>}
                     </div>
                   </div>
                   {formData.role === 'student' && (
@@ -904,11 +948,21 @@ export default function PatientsPage() {
                 </div>
 
                 <div className="flex justify-end gap-4 mt-6">
-                  <Button variant="outline" onClick={() => { setShowForm(false); setEditingPatient(null); }}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowForm(false)
+                      setEditingPatient(null)
+                      setFormData(initialFormData)
+                      setSelectedDateOfBirth(undefined)
+                      setAvailableCourses([])
+                      setFormErrors({})
+                    }}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleAddOrEdit}>
-                    {editingPatient ? "Update Patient" : "Add Patient"}
+                  <Button onClick={handleAddOrEdit} disabled={isSubmitting}>
+                    {isSubmitting ? (editingPatient ? "Updating..." : "Adding...") : (editingPatient ? "Update Patient" : "Add Patient")}
                   </Button>
                 </div>
               </div>
@@ -928,7 +982,7 @@ export default function PatientsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-bold">{getFullName(patient)}</h3>
-                      <p className="text-sm text-gray-600">ID: {index + 1} | Role: {patient.role.replace('_', ' ')}</p>
+                      <p className="text-sm text-gray-600">ID: {patient.numericId ?? (index + 1)} | Role: {patient.role.replace('_', ' ')}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => setExpandedId(expandedId === patient.id ? null : patient.id)}>

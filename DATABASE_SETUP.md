@@ -19,35 +19,9 @@ DATABASE_URL="file:./backend/prisma/prisma/dev.db"
 
 ## Production Setup (Vercel)
 
-You have two options:
+For production, you'll need to use a cloud database since Vercel's filesystem is read-only. We recommend PostgreSQL:
 
-### Option 1: Turso (Cloud SQLite) - Recommended ⭐
-
-Turso provides a cloud-hosted SQLite database that's compatible with your existing schema.
-
-1. **Sign up for Turso**: https://turso.tech
-2. **Create a database** in the Turso dashboard
-3. **Get your database URL** from the Turso dashboard
-4. **Add environment variable in Vercel**:
-   - Go to your Vercel project settings
-   - Navigate to "Environment Variables"
-   - Add `DATABASE_URL` with your Turso database URL (format: `libsql://your-db.turso.io`)
-   - Add `TURSO_AUTH_TOKEN` (get this from Turso dashboard)
-
-5. **Run migrations on Turso**:
-   ```bash
-   # Install Turso CLI
-   npm install -g @libsql/client
-   
-   # Or use the Turso CLI to sync your local database
-   turso db shell your-database-name
-   ```
-
-### Option 2: PostgreSQL (Requires Schema Migration)
-
-If you prefer PostgreSQL, you'll need to:
-
-1. **Set up Vercel Postgres** or another PostgreSQL provider
+1. **Set up Vercel Postgres** or another PostgreSQL provider (e.g., Supabase, PlanetScale)
 2. **Update Prisma schema** to use PostgreSQL:
    ```prisma
    datasource db {
@@ -55,7 +29,10 @@ If you prefer PostgreSQL, you'll need to:
      url      = env("DATABASE_URL")
    }
    ```
-3. **Create new migrations** for PostgreSQL
+3. **Create new migrations** for PostgreSQL:
+   ```bash
+   npx prisma migrate reset --force
+   ```
 4. **Run migrations** on the production database
 
 ## Migration Commands
@@ -70,15 +47,7 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
-## Quick Start with Turso
 
-1. Install Turso CLI: `npm install -g @libsql/client` or follow [Turso docs](https://docs.turso.tech)
-2. Create database: `turso db create your-database-name`
-3. Get URL: `turso db show your-database-name --url`
-4. Get auth token: `turso db tokens create your-database-name`
-5. Add to Vercel environment variables:
-   - `DATABASE_URL` = your Turso URL
-   - `TURSO_AUTH_TOKEN` = your auth token
 
 ## Important Notes
 

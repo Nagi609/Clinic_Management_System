@@ -20,15 +20,25 @@ async function updateUser() {
 
     console.log(`Found user: ${existingUser.username} (${existingUser.email})`);
 
+    // Get new credentials from environment or command line
+    const newUsername = process.env.NEW_USERNAME || process.argv[2] || 'admin'
+    const newEmail = process.env.NEW_EMAIL || process.argv[3] || 'admin@clinic.com'
+    const newPassword = process.env.NEW_PASSWORD || process.argv[4]
+
+    if (!newPassword) {
+      console.error('Password is required. Set via NEW_PASSWORD env or pass as argument')
+      process.exit(1)
+    }
+
     // Hash the new password
-    const hashedPassword = await bcrypt.hash('Sorsuclinic@2025', 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update the user
     const updatedUser = await prisma.user.update({
       where: { id: existingUser.id },
       data: {
-        username: 'sorsuclinic',
-        email: 'sorsuclinic@gmail.com',
+        username: newUsername,
+        email: newEmail,
         password: hashedPassword,
         fullName: 'SorSU Clinic',
         role: 'admin',

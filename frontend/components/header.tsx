@@ -46,6 +46,7 @@ export function Header() {
     localStorage.removeItem("patients")
     localStorage.removeItem("visits")
     localStorage.removeItem("clinicContacts")
+    setProfileOpen(false)
     router.push("/login")
   }
 
@@ -67,7 +68,7 @@ export function Header() {
           </button>
           {profileOpen && (
             <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg w-48">
-              <Link href="/profile" className="block px-4 py-2 hover:bg-gray-50 border-b">
+              <Link href="/profile" className="block px-4 py-2 hover:bg-gray-50 border-b" onClick={() => setProfileOpen(false)}>
                 My Profile
               </Link>
               <button onClick={handleSignOut} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-600">

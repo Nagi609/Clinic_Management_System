@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/db'
+import { prisma } from '@/lib/db'
 
 // GET all clinic contacts for the current user
 export async function GET(request: NextRequest) {

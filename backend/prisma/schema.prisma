@@ -12,6 +12,7 @@ datasource db {
 //
 model Patient {
   id                String        @id @default(cuid())
+  numericId         Int           @unique @default(0)
 
   // Personal Information
   firstName         String

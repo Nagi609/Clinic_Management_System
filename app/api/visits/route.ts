@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import prisma from "@/lib/db"
+import { prisma } from "@/lib/db"
 import { getNextIdForUser } from "@/lib/id-utils"
 
 // GET all visits for the current user
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     const visit = await prisma.visitRecord.create({
       data: {
-        id: nextId,
+        id: String(nextId),
         patientId,
         visitDate: new Date().toISOString(),
         reason,

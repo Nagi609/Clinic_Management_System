@@ -5,9 +5,15 @@ const bcrypt = require('bcryptjs')
 const prisma = new PrismaClient()
 
 async function main() {
-  const email = 'sorsuclinic@gmail.com'
-  const username = 'sorsuclinic'
-  const password = 'Sorsuclinic@2025'
+  const email = process.env.ADMIN_EMAIL || process.argv[2] || 'admin@clinic.com'
+  const username = process.env.ADMIN_USERNAME || process.argv[3] || 'admin'
+  const password = process.env.ADMIN_PASSWORD || process.argv[4]
+
+  if (!password) {
+    console.error('Password is required. Set via ADMIN_PASSWORD env or pass as argument')
+    console.error('Usage: ADMIN_EMAIL=email ADMIN_USERNAME=user ADMIN_PASSWORD=pass node create-admin.js')
+    process.exit(1)
+  }
   const hashed = await bcrypt.hash(password, 10)
 
   // Check if admin exists

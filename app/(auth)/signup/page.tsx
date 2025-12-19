@@ -1,17 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { Eye, EyeOff, ChevronDown, Check, X } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { validateEmail, validatePassword } from "@/lib/auth"
 
 export default function SignupPage() {
   const [username, setUsername] = useState("")
   const [usernameError, setUsernameError] = useState("")
-  const [usernameChecking, setUsernameChecking] = useState(false)
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
 
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -22,53 +20,16 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  // Check username availability with debounce
-  const checkUsernameAvailability = useCallback(async (user: string) => {
-    if (!user || user.length < 3) {
-      setUsernameAvailable(null)
-      setUsernameError("")
-      return
-    }
-
-    setUsernameChecking(true)
-    try {
-      const response = await fetch("/api/auth/check-username", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user }),
-      })
-      const data = await response.json()
-      if (data.available) {
-        setUsernameAvailable(true)
-        setUsernameError("")
-      } else {
-        setUsernameAvailable(false)
-        setUsernameError("Username is already taken")
-      }
-    } catch (error) {
-      console.error("Error checking username:", error)
-      setUsernameError("Error checking username availability")
-    } finally {
-      setUsernameChecking(false)
-    }
-  }, [])
-
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setUsername(value)
 
     if (value && value.length < 3) {
       setUsernameError("Username must be at least 3 characters")
-      setUsernameAvailable(null)
     } else if (value && !/^[a-zA-Z0-9_-]+$/.test(value)) {
       setUsernameError("Username can only contain letters, numbers, underscore, and dash")
-      setUsernameAvailable(null)
     } else {
       setUsernameError("")
-      const timer = setTimeout(() => {
-        checkUsernameAvailability(value)
-      }, 500)
-      return () => clearTimeout(timer)
     }
   }
 
@@ -83,7 +44,6 @@ export default function SignupPage() {
     else if (username.length < 3) newErrors.push("Username must be at least 3 characters")
     else if (!/^[a-zA-Z0-9_-]+$/.test(username))
       newErrors.push("Username can only contain letters, numbers, underscore, and dash")
-    else if (!usernameAvailable) newErrors.push("Username is not available")
 
     if (!fullName.trim()) newErrors.push("Full name is required")
     if (!email.trim()) newErrors.push("Email is required")
@@ -144,30 +104,18 @@ export default function SignupPage() {
             {/* Username Input */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-2">Username</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={username}
-                  onChange={handleUsernameChange}
-                  placeholder="Choose a unique username"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 pr-10 ${
-                    usernameError
-                      ? "border-red-300 focus:ring-red-500"
-                      : usernameAvailable
-                      ? "border-green-300 focus:ring-green-500"
-                      : "border-gray-300 focus:ring-[#8B3A3A]"
-                  }`}
-                />
-                {usernameChecking && (
-                  <div className="absolute right-4 top-3">
-                    <div className="animate-spin h-5 w-5 border-2 border-[#8B3A3A] border-t-transparent rounded-full"></div>
-                  </div>
-                )}
-                {!usernameChecking && usernameAvailable && <Check className="absolute right-4 top-3 text-green-500" size={20} />}
-                {!usernameChecking && usernameError && <X className="absolute right-4 top-3 text-red-500" size={20} />}
-              </div>
+              <input
+                type="text"
+                value={username}
+                onChange={handleUsernameChange}
+                placeholder="Choose a username"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 ${
+                  usernameError
+                    ? "border-red-300 focus:ring-red-500"
+                    : "border-gray-300 focus:ring-[#8B3A3A]"
+                }`}
+              />
               {usernameError && <p className="text-red-600 text-xs mt-1">{usernameError}</p>}
-              {usernameAvailable && <p className="text-green-600 text-xs mt-1">✓ Username is available</p>}
               <p className="text-gray-500 text-xs mt-1">3+ characters, letters, numbers, underscore, dash only</p>
             </div>
 
@@ -216,7 +164,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={isLoading || !usernameAvailable}
+              disabled={isLoading}
               className="w-full bg-[#8B3A3A] text-white py-3 rounded-lg font-semibold hover:bg-[#6D2E2E] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Creating Account..." : "Create Account"}

@@ -4,6 +4,8 @@ node_modules
 # Database files
 backend/prisma/prisma/dev.db
 backend/prisma/prisma/dev.db-journal
+# Local SQLite DB (actual path)
+backend/prisma/dev.db
 # Logs
 *.log
 # Environment variables

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/db'
+import { prisma } from '@/lib/db'
 
 // Validation helpers
 const validateNameField = (name: string): boolean => {
@@ -13,8 +13,8 @@ const validatePhone = (phone: string): boolean => {
 }
 
 const validateIdNumber = (idNumber: string): boolean => {
-  // Can contain letters, numbers, and dash only
-  return /^[a-zA-Z0-9-]+$/.test(idNumber)
+  // Must contain numbers only (no letters or symbols)
+  return /^\d+$/.test(idNumber)
 }
 
 const validateEmail = (email: string): boolean => {
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       errors.push('Valid role is required')
     }
     if (!idNumber || !validateIdNumber(idNumber)) {
-      errors.push('ID number is required and can only contain letters, numbers, and dashes')
+      errors.push('ID number is required and must contain numbers only')
     }
 
     // Validate role-specific fields
@@ -150,10 +150,14 @@ export async function POST(request: NextRequest) {
       if (!course) {
         errors.push('Course is required for students')
       }
-      if (!yearLevel || yearLevel < 1 || yearLevel > 4) {
+
+      const yearLevelNum = yearLevel === undefined || yearLevel === null || yearLevel === '' ? null : Number(yearLevel)
+      const blockNum = block === undefined || block === null || block === '' ? null : Number(block)
+
+      if (yearLevelNum === null || Number.isNaN(yearLevelNum) || yearLevelNum < 1 || yearLevelNum > 4) {
         errors.push('Valid year level (1-4) is required for students')
       }
-      if (!block || block < 1 || block > 5) {
+      if (blockNum === null || Number.isNaN(blockNum) || blockNum < 1 || blockNum > 5) {
         errors.push('Valid block (1-5) is required for students')
       }
     }
@@ -165,7 +169,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (role === 'non_teaching_staff') {
-      if (!staffCategory || !['Administrative', 'Security', 'Maintenance', 'Support', 'Clinic'].includes(staffCategory)) {
+      // Accept categories used by the frontend
+      const allowedCategories = ['Administration', 'Accounting', 'Human Resources', 'Student Service', 'Library', 'Maintenance', 'Security', 'Supply', 'Clinic']
+      if (!staffCategory || !allowedCategories.includes(staffCategory)) {
         errors.push('Valid category is required for non-teaching staff')
       }
     }
@@ -185,8 +191,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ errors }, { status: 400 })
     }
 
+    // Prevent duplicate patient (same idNumber for same user)
+    try {
+      const existing = await prisma.patient.findFirst({ where: { userId, idNumber } })
+      if (existing) {
+        return NextResponse.json({ error: 'Patient with this ID number already exists' }, { status: 409 })
+      }
+    } catch (err) {
+      console.error('Duplicate check error:', err)
+      // proceed — creation will fail if there's an issue
+    }
+
+    // Generate unique numericId for this user
+    const maxNumericId = await prisma.patient.aggregate({
+      where: { userId },
+      _max: { numericId: true }
+    })
+    const nextNumericId = (maxNumericId._max.numericId ?? 0) + 1
+
+    const yearLevelNum = yearLevel === undefined || yearLevel === null || yearLevel === '' ? null : Number(yearLevel)
+    const blockNum = block === undefined || block === null || block === '' ? null : Number(block)
+
     const patient = await prisma.patient.create({
       data: {
+        numericId: nextNumericId,
         firstName,
         middleName: middleName || null,
         lastName,
@@ -200,8 +228,8 @@ export async function POST(request: NextRequest) {
         idNumber,
         program: role === 'student' ? program : null,
         course: role === 'student' ? course : null,
-        yearLevel: role === 'student' ? yearLevel : null,
-        block: role === 'student' ? block : null,
+        yearLevel: role === 'student' ? yearLevelNum : null,
+        block: role === 'student' ? blockNum : null,
         department: role === 'teaching_staff' ? department : null,
         staffCategory: role === 'non_teaching_staff' ? staffCategory : null,
         // Medical History
@@ -227,6 +255,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ patient }, { status: 201 })
   } catch (error) {
     console.error('Create patient error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// DELETE - remove a patient
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id')
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const body = await request.json().catch(() => ({}))
+    const { id } = body
+    if (!id) return NextResponse.json({ error: 'Patient ID required' }, { status: 400 })
+
+    const patientId = String(id)
+    const patient = await prisma.patient.findUnique({ where: { id: patientId } })
+    if (!patient || patient.userId !== userId) {
+      return NextResponse.json({ error: 'Patient not found or unauthorized' }, { status: 404 })
+    }
+
+    await prisma.patient.delete({ where: { id: patientId } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete patient error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -276,7 +328,8 @@ export async function PUT(request: NextRequest) {
 
     if (!id) return NextResponse.json({ error: 'Patient ID required' }, { status: 400 })
 
-    const patient = await prisma.patient.findUnique({ where: { id } })
+    const patientId = String(id)
+    const patient = await prisma.patient.findUnique({ where: { id: patientId } })
     if (!patient || patient.userId !== userId) {
       return NextResponse.json({ error: 'Patient not found or unauthorized' }, { status: 404 })
     }
@@ -303,7 +356,7 @@ export async function PUT(request: NextRequest) {
       errors.push('Email must be a valid email address')
     }
     if (idNumber && !validateIdNumber(idNumber)) {
-      errors.push('ID number can only contain letters, numbers, and dashes')
+      errors.push('ID number can only contain numbers')
     }
 
     // Validate primary emergency contact if provided
@@ -321,8 +374,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ errors }, { status: 400 })
     }
 
+    const yearLevelNum = yearLevel === undefined || yearLevel === null || yearLevel === '' ? null : Number(yearLevel)
+    const blockNum = block === undefined || block === null || block === '' ? null : Number(block)
+
     const updatedPatient = await prisma.patient.update({
-      where: { id },
+      where: { id: patientId },
       data: {
         firstName: firstName || undefined,
         middleName: middleName || null,
@@ -337,8 +393,8 @@ export async function PUT(request: NextRequest) {
         idNumber: idNumber || undefined,
         program: role === 'student' ? program : null,
         course: role === 'student' ? course : null,
-        yearLevel: role === 'student' ? yearLevel : null,
-        block: role === 'student' ? block : null,
+        yearLevel: role === 'student' ? yearLevelNum : null,
+        block: role === 'student' ? blockNum : null,
         department: role === 'teaching_staff' ? department : null,
         staffCategory: role === 'non_teaching_staff' ? staffCategory : null,
         // Medical History

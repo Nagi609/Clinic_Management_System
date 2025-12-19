@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Grid3x3, Users, FileText, Phone } from "lucide-react"
 
 export function Sidebar() {
@@ -32,7 +32,8 @@ export function Sidebar() {
         <p className="text-sm font-medium text-gray-400 px-4 mb-4">Navigation</p>
         {navItems.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href
+          // consider subpaths active (e.g. /patients/123)
+          const isActive = pathname?.startsWith(item.href)
           return (
             <Link
               key={item.href}
@@ -40,6 +41,7 @@ export function Sidebar() {
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive ? "bg-[#8B3A3A] text-white" : "text-gray-700 hover:bg-gray-100"
               }`}
+              aria-current={isActive ? 'page' : undefined}
             >
               <Icon size={20} />
               <span>{item.label}</span>
