@@ -57,5 +57,7 @@ export const checkPermission = (
   role: string,
   permission: keyof typeof ROLE_PERMISSIONS.student
 ): boolean => {
-  return ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]?.[permission] ?? false
+  if (!role) return false
+  const key = role.toLowerCase() as keyof typeof ROLE_PERMISSIONS
+  return ROLE_PERMISSIONS[key]?.[permission] ?? false
 }
